@@ -1,8 +1,10 @@
 import 'package:app/model/levely_models.dart';
 import 'package:app/service/levely_engine.dart';
 import 'package:app/service/levely_gamification.dart';
+import 'package:app/service/levely_llm_config.dart';
 import 'package:app/service/levely_llm_client.dart';
 import 'package:app/service/levely_rag.dart';
+import 'package:app/service/levely_runtime_config.dart';
 import 'package:flutter/foundation.dart';
 
 class LevelyCompanionObservation {
@@ -182,6 +184,7 @@ class LevelyCompanionObserver {
 class LevelyCompanionFeedback {
   String? guardrails({
     required String prompt,
+    required LevelyProgress progress,
     String? chapterName,
     String? materialContent,
   }) {
@@ -195,6 +198,15 @@ class LevelyCompanionFeedback {
         (materialContent != null && materialContent.trim().isNotEmpty);
     if (!hasScope) {
       return "Aku hanya bisa jawab saat kamu berada di bab/topik tertentu. Buka babnya lalu tanya di situ.";
+    }
+
+    if (_isPerformanceRequest(lower)) {
+      if (!_hasSubmission(progress)) {
+        return "Feedback performa hanya tersedia setelah kamu submit kuis/assessment/assignment. Selesaikan dulu, lalu aku bantu ringkas hasilnya.";
+      }
+      if (!_mentionsSubmissionType(lower)) {
+        return "Aku bisa bahas hasil submission kamu. Mau bahas hasil kuis, assessment, atau assignment yang mana?";
+      }
     }
 
     final promptTokens = _tokenize(trimmed);
@@ -280,6 +292,15 @@ class LevelyCompanionFeedback {
     String? chapterName,
   }) {
     final p = prompt.toLowerCase();
+    if (_isPerformanceRequest(p)) {
+      if (!_hasSubmission(progress)) {
+        return "Feedback performa hanya tersedia setelah kamu submit kuis/assessment/assignment. Selesaikan dulu, lalu aku bantu ringkas hasilnya.";
+      }
+      if (!_mentionsSubmissionType(p)) {
+        return "Aku bisa bahas hasil submission kamu. Mau bahas hasil kuis, assessment, atau assignment yang mana?";
+      }
+      return "Sebutkan bagian hasil submission yang ingin kamu bahas.";
+    }
     if (p.contains('ringkas') || p.contains('summary')) {
       return "Sebutkan bagian${_chapterSuffix(chapterName)} yang ingin diringkas.";
     }
@@ -386,7 +407,10 @@ class LevelyCompanionFeedback {
   bool _hasContextHint(String lowerPrompt) {
     final hints = [
       'bab ini',
+      'bab aktif',
+      'bab sekarang',
       'topik ini',
+      'topik aktif',
       'materi ini',
       'bagian ini',
       'di sini',
@@ -411,7 +435,20 @@ class LevelyCompanionFeedback {
 
   String _outOfScopeMessage(String? chapterName) {
     final label = chapterName == null || chapterName.trim().isEmpty ? "materi yang sedang kamu buka" : "bab ${chapterName.trim()}";
-    return "Aku hanya bisa jawab untuk $label. Tanyakan hal terkait itu ya.";
+    return "Pertanyaanmu di luar scope. Aku hanya bisa bantu untuk $label. Bagian mana dari $label yang ingin kamu bahas?";
+  }
+
+  bool _hasSubmission(LevelyProgress progress) {
+    return progress.history.isNotEmpty || progress.attemptedTotal > 0;
+  }
+
+  bool _mentionsSubmissionType(String lowerPrompt) {
+    return _submissionTypeHints.any(lowerPrompt.contains);
+  }
+
+  bool _isPerformanceRequest(String lowerPrompt) {
+    if (_performanceQuestionPattern.hasMatch(lowerPrompt)) return true;
+    return _selfPerformancePattern.hasMatch(lowerPrompt);
   }
 
   List<String> _tokenize(String text) {
@@ -450,6 +487,20 @@ class LevelyCompanionFeedback {
   }
 
   static const Set<String> _shortScopeTokens = {'ui', 'ux', 'ai', 'ml'};
+  static const List<String> _submissionTypeHints = [
+    'quiz',
+    'kuis',
+    'assessment',
+    'asesmen',
+    'assignment',
+    'tugas',
+  ];
+  static final RegExp _performanceQuestionPattern = RegExp(
+    r'(gimana|bagaimana|seberapa|cek|lihat|review|evaluasi)\s+(progres|progress|performa|hasil|nilai|skor|score|kemajuan|akurasi|poin|streak)',
+  );
+  static final RegExp _selfPerformancePattern = RegExp(
+    r'(progres|progress|performa|hasil|nilai|skor|score|kemajuan|akurasi|poin|streak)(ku|\s*(saya|aku))',
+  );
 
   String limitSentences(String text, {int maxSentences = 6}) {
     final trimmed = text.trim();
@@ -461,7 +512,9 @@ class LevelyCompanionFeedback {
 }
 
 class LevelyCompanion {
-  final LevelyEngine engine;
+  final bool _lockEngine;
+  LevelyEngine _engine;
+  int _engineRevision;
   final LevelyCompanionObserver observer;
   final LevelyCompanionFeedback feedback;
 
@@ -469,37 +522,45 @@ class LevelyCompanion {
     LevelyEngine? engine,
     LevelyCompanionObserver? observer,
     LevelyCompanionFeedback? feedback,
-  })  : engine = engine ?? _buildEngine(),
+  })  : _lockEngine = engine != null,
+        _engine = engine ?? _buildEngine(),
+        _engineRevision = LevelyRuntimeConfig.revision,
         observer = observer ?? LevelyCompanionObserver(),
         feedback = feedback ?? LevelyCompanionFeedback();
 
-  static LevelyEngine _buildEngine() {
-    var apiKey = const String.fromEnvironment('LEVELY_LLM_API_KEY');
-    if (apiKey.trim().isEmpty) {
-      apiKey = const String.fromEnvironment('LEVELY_OPENAI_API_KEY');
+  LevelyEngine get engine {
+    if (!_lockEngine && _engineRevision != LevelyRuntimeConfig.revision) {
+      _engine = _buildEngine();
+      _engineRevision = LevelyRuntimeConfig.revision;
     }
-    if (apiKey.trim().isEmpty) {
+    return _engine;
+  }
+
+  static LevelyEngine _buildEngine() {
+    final allowOverrides = kDebugMode;
+    final overrides = allowOverrides ? LevelyRuntimeConfig.overrides : const LevelyLlmOverrides();
+    final config = LevelyLlmConfigResolver.resolve(
+      allowOverrides: allowOverrides,
+      overrides: overrides,
+    );
+
+    if (!config.enabled) {
       if (kDebugMode) {
         debugPrint('Levely LLM disabled: no API key set.');
       }
       return LevelyEngine();
     }
-    var model = const String.fromEnvironment('LEVELY_LLM_MODEL');
-    if (model.trim().isEmpty) {
-      model = const String.fromEnvironment('LEVELY_OPENAI_MODEL');
-    }
-    final baseUrl = const String.fromEnvironment('LEVELY_LLM_BASE_URL');
+
     if (kDebugMode) {
-      final resolvedModel = model.trim().isEmpty ? 'gpt-4o-mini' : model.trim();
-      final resolvedBaseUrl = baseUrl.trim().isEmpty ? 'https://api.openai.com/v1/chat/completions' : baseUrl.trim();
-      debugPrint('Levely LLM enabled with model: $resolvedModel');
-      debugPrint('Levely LLM base URL: $resolvedBaseUrl');
+      debugPrint('Levely LLM enabled with provider: gemini');
+      debugPrint('Levely LLM model: ${config.model}');
+      debugPrint('Levely LLM base URL: ${config.baseUrl}');
     }
     return LevelyEngine(
-      llm: OpenAiChatCompletionsClient(
-        apiKey: apiKey,
-        model: model.trim().isEmpty ? 'gpt-4o-mini' : model.trim(),
-        baseUrl: baseUrl.trim().isEmpty ? 'https://api.openai.com/v1/chat/completions' : baseUrl.trim(),
+      llm: GeminiApiClient(
+        apiKey: config.apiKey,
+        model: config.model,
+        baseUrl: config.baseUrl,
       ),
     );
   }
@@ -608,18 +669,8 @@ class LevelyCompanion {
     String? chapterName,
     String? materialContent,
   }) async {
-    final guard = feedback.guardrails(
-      prompt: prompt,
-      chapterName: chapterName,
-      materialContent: materialContent,
-    );
-    if (guard != null) return guard;
-
-    final snippet = (materialContent == null || materialContent.trim().isEmpty)
-        ? ''
-        : LevelyRag.buildSnippet(material: materialContent, query: prompt);
-
-    if (engine.llm == null) {
+    final llm = engine.llm;
+    if (llm == null) {
       if (kDebugMode) {
         debugPrint('Levely QuickAsk fallback: LLM disabled.');
       }
@@ -628,6 +679,9 @@ class LevelyCompanion {
     }
 
     try {
+      final snippet = (materialContent == null || materialContent.trim().isEmpty)
+          ? ''
+          : LevelyRag.buildSnippet(material: materialContent);
       final reply = await engine.answerChat(
         userMessage: prompt,
         progress: progress,

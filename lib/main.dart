@@ -2,6 +2,7 @@ import 'package:app/utils/colors.dart';
 import 'package:app/view/login_screen.dart';
 import 'package:app/view/main_screen.dart';
 import 'package:app/view/onboarding_screen.dart';
+import 'package:app/service/levely_runtime_config.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,6 +15,7 @@ void main() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   bool isFirstLaunch = prefs.getBool('firstLaunch') ?? true;
   final bool isLoggedIn = await checkLoginStatus();
+  await LevelyRuntimeConfig.initialize();
 
   await Supabase.initialize(
       url: "https://vvivfqnqxnpfpijrvkkb.supabase.co",

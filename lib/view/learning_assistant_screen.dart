@@ -4,6 +4,8 @@ import 'package:app/service/levely_gamification.dart';
 import 'package:app/service/chapter_service.dart';
 import 'package:app/service/levely_companion.dart';
 import 'package:app/service/levely_quiz_bank.dart';
+import 'package:app/view/levely_llm_settings_sheet.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class LearningAssistantScreen extends StatefulWidget {
@@ -58,7 +60,7 @@ class _LearningAssistantScreenState extends State<LearningAssistantScreen> {
     _messages.insert(
       0,
       LevelyChatMessage.assistant(
-        "Halo! Aku Levely. Tanyakan soal bab atau topik yang sedang kamu pelajari.",
+        "Halo! Aku Levely. Tanyakan hal umum yang terkait bab atau topik yang sedang kamu pelajari.",
       ),
     );
     if (widget.courseId != null || widget.level != null || widget.chapterName != null) {
@@ -226,6 +228,15 @@ class _LearningAssistantScreenState extends State<LearningAssistantScreen> {
                 ),
               ],
             ),
+            actions: [
+              if (kDebugMode)
+                IconButton(
+                  onPressed: () => showLevelyLlmSettingsSheet(context),
+                  icon: const Icon(Icons.settings_outlined),
+                  tooltip: 'LLM Settings',
+                  color: Colors.white,
+                ),
+            ],
           ),
           body: GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),

@@ -2,6 +2,8 @@ import 'package:app/utils/colors.dart';
 import 'package:app/model/levely_models.dart';
 import 'package:app/service/chapter_service.dart';
 import 'package:app/service/levely_companion.dart';
+import 'package:app/view/levely_llm_settings_sheet.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 Future<List<LevelyChatMessage>?> showLearningAssistantQuickAsk(
@@ -75,7 +77,7 @@ class _LearningAssistantQuickAskSheetState extends State<_LearningAssistantQuick
     _messages.insert(
       0,
       LevelyChatMessage.assistant(
-        "Aku Levely. Quick Ask khusus untuk bab ini.",
+        "Aku Levely. Quick Ask untuk bab ini. Tanyakan hal terkait bab/topik aktif.",
       ),
     );
 
@@ -202,6 +204,13 @@ class _LearningAssistantQuickAskSheetState extends State<_LearningAssistantQuick
                         ),
                       ),
                     ),
+                    if (kDebugMode)
+                      IconButton(
+                        onPressed: () => showLevelyLlmSettingsSheet(context),
+                        icon: Icon(Icons.settings_outlined, size: 20),
+                        tooltip: "LLM Settings",
+                        color: AppColors.primaryColor,
+                      ),
                     IconButton(
                       onPressed: () => Navigator.pop(context, _messages),
                       icon: Icon(Icons.open_in_full, size: 20),
@@ -247,7 +256,7 @@ class _LearningAssistantQuickAskSheetState extends State<_LearningAssistantQuick
                       maxLines: 3,
                       onSubmitted: (_) => _send(),
                       decoration: InputDecoration(
-                        hintText: "Tanya cepat…",
+                        hintText: "Tanya cepat tentang bab ini.",
                         hintStyle: TextStyle(color: Colors.grey, fontFamily: 'DIN_Next_Rounded'),
                         filled: true,
                         fillColor: Color(0xFFF3EDF7),

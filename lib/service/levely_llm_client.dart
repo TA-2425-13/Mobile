@@ -12,15 +12,15 @@ class LevelyLlmClient {
   }
 }
 
-class OpenAiChatCompletionsClient extends LevelyLlmClient {
+class GeminiApiClient extends LevelyLlmClient {
   final String apiKey;
   final String model;
   final String baseUrl;
 
-  OpenAiChatCompletionsClient({
+  GeminiApiClient({
     required this.apiKey,
-    this.model = 'gpt-4o-mini',
-    this.baseUrl = 'https://api.openai.com/v1/chat/completions',
+    this.model = 'gemini-1.5-pro',
+    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models',
   });
 
   @override
@@ -29,22 +29,34 @@ class OpenAiChatCompletionsClient extends LevelyLlmClient {
     required String context,
     required List<({String role, String content})> messages,
   }) async {
-    final uri = Uri.parse(baseUrl);
-    final payload = {
-      'model': model,
-      'temperature': 0.3,
-      'messages': [
-        {'role': 'system', 'content': system},
-        {'role': 'system', 'content': context},
-        ...messages.map((m) => {'role': m.role, 'content': m.content}),
-      ],
+    final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final uri = Uri.parse('$base/$model:generateContent?key=$apiKey');
+    final instruction = _mergeInstruction(system: system, context: context);
+    final contents = messages
+        .map((m) => {
+              'role': m.role == 'assistant' ? 'model' : 'user',
+              'parts': [
+                {'text': m.content},
+              ],
+            })
+        .toList();
+
+    final payload = <String, dynamic>{
+      'contents': contents,
+      'generationConfig': {'temperature': 0.3},
     };
+    if (instruction.isNotEmpty) {
+      payload['systemInstruction'] = {
+        'parts': [
+          {'text': instruction},
+        ],
+      };
+    }
 
     final res = await http.post(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $apiKey',
       },
       body: jsonEncode(payload),
     );
@@ -54,8 +66,23 @@ class OpenAiChatCompletionsClient extends LevelyLlmClient {
     }
 
     final json = (jsonDecode(res.body) as Map).cast<String, dynamic>();
-    final choices = (json['choices'] as List).cast<dynamic>();
-    final msg = (choices.first as Map).cast<String, dynamic>()['message'] as Map;
-    return (msg['content'] as String?)?.trim() ?? '';
+    final candidates = (json['candidates'] as List?)?.cast<dynamic>() ?? const [];
+    if (candidates.isEmpty) return '';
+    final content = (candidates.first as Map).cast<String, dynamic>()['content'] as Map?;
+    final parts = (content?['parts'] as List?)?.cast<dynamic>() ?? const [];
+    final text = parts
+        .map((p) => (p as Map).cast<String, dynamic>()['text'] as String?)
+        .where((t) => t != null && t.trim().isNotEmpty)
+        .join('\n');
+    return text.trim();
+  }
+
+  String _mergeInstruction({required String system, required String context}) {
+    final sys = system.trim();
+    final ctx = context.trim();
+    if (sys.isEmpty && ctx.isEmpty) return '';
+    if (sys.isEmpty) return ctx;
+    if (ctx.isEmpty) return sys;
+    return '$sys\n\n$ctx';
   }
 }

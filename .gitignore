@@ -26,9 +26,6 @@ ios/GoogleService-Info.plist
 *.DS_Store
 *.log
 
-# Local secrets
-env.json
-
 # Build outputs
 build/
 *.apk
