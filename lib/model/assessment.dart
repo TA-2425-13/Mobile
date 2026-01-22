@@ -57,9 +57,4 @@ class Question {
   set selectedMultiAnswer(List<String> list) {
     _selectedMultiAnswer = list;
   }
-
-
-
-
-
 }

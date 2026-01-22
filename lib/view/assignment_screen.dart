@@ -4,12 +4,10 @@ import 'dart:async';
 import 'dart:io';
 import 'package:app/model/assignment.dart';
 import 'package:app/model/chapter_status.dart';
-import 'package:app/model/levely_models.dart';
 import 'package:app/model/learning_material.dart';
 import 'package:app/model/user_course.dart';
 import 'package:app/service/badge_service.dart';
 import 'package:app/service/chapter_service.dart';
-import 'package:app/service/levely_companion.dart';
 import 'package:app/service/user_chapter_service.dart';
 import 'package:app/service/user_service.dart';
 import 'package:app/utils/colors.dart';
@@ -63,7 +61,6 @@ class AssignmentScreen extends StatefulWidget {
 }
 
 class _AssignmentScreenState extends State<AssignmentScreen> {
-  final LevelyCompanion _companion = LevelyCompanion();
   late ChapterStatus status;
   Assignment? assignment;
   Student? user;
@@ -78,8 +75,6 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
   int chLength = 0;
   bool complete = false;
   bool showDialogAssignmentOnce = false;
-  LevelyProgress _learningProgress = LevelyProgress.empty();
-  String? _companionFeedback;
 
   @override
   void initState() {
@@ -95,38 +90,12 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
       lastestSubmissionUrl = status.submission!;
     }
     super.initState();
-    _loadProgress();
   }
 
   void getAssignment(int id) async {
     final resultAssignment = await ChapterService.getAssignmentByChapterId(id);
     setState(() {
       assignment = resultAssignment;
-    });
-  }
-
-  Future<void> _loadProgress() async {
-    final progress = await _companion.loadProgress();
-    if (!mounted) return;
-    setState(() {
-      _learningProgress = progress;
-    });
-  }
-
-  Future<void> _captureCompanionFeedback() async {
-    if (_companionFeedback != null || !status.assignmentDone) return;
-    final score = status.assignmentScore > 0 ? status.assignmentScore : null;
-    final result = await _companion.observeAssignment(
-      progress: _learningProgress,
-      now: DateTime.now(),
-      score: score,
-      chapterName: widget.chapterName,
-      referenceId: 'assignment:${status.chapterId}',
-    );
-    if (!mounted) return;
-    setState(() {
-      _learningProgress = result.progress;
-      _companionFeedback = result.feedback;
     });
   }
 
@@ -203,7 +172,6 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
         widget.updateStatus(status);
       });
       await updateStatus();
-      await _captureCompanionFeedback();
     } catch (e) {
       if (kDebugMode) {
         print('Upload error: $e');
@@ -496,30 +464,6 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                     ),
                   ),
                 ),
-                if (_companionFeedback != null) ...[
-                  SizedBox(height: 12),
-                  Container(
-                    width: MediaQuery.of(context).size.width,
-                    padding: EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade400),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Levely Feedback",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded'),
-                        ),
-                        Text(
-                          _companionFeedback!,
-                          style: TextStyle(fontFamily: 'DIN_Next_Rounded', height: 1.35),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ],
             ),
           )

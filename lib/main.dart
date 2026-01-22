@@ -2,8 +2,8 @@ import 'package:app/utils/colors.dart';
 import 'package:app/view/login_screen.dart';
 import 'package:app/view/main_screen.dart';
 import 'package:app/view/onboarding_screen.dart';
-import 'package:app/service/levely_runtime_config.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -12,16 +12,24 @@ Color backgroundNavHex = Color(0xFFF3EDF7);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _loadEnv();
   SharedPreferences prefs = await SharedPreferences.getInstance();
   bool isFirstLaunch = prefs.getBool('firstLaunch') ?? true;
   final bool isLoggedIn = await checkLoginStatus();
-  await LevelyRuntimeConfig.initialize();
 
   await Supabase.initialize(
       url: "https://vvivfqnqxnpfpijrvkkb.supabase.co",
       anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2aXZmcW5xeG5wZnBpanJ2a2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MTQxMjEsImV4cCI6MjA3NDE5MDEyMX0.VwNktSJnyCuvBHEEMw4hv4wsHm7wT1MxS6foqR2i4Nk"
   );
   runApp(MyApp(isLoggedIn: isLoggedIn, isFirstLaunch: isFirstLaunch));
+}
+
+Future<void> _loadEnv() async {
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // Ignore missing .env; dart-define or runtime overrides can still be used.
+  }
 }
 
 Future<bool> checkLoginStatus() async {
