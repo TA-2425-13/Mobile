@@ -1,4 +1,3 @@
-import 'package:app/global_var.dart';
 import 'package:app/model/chapter.dart';
 import 'package:app/main.dart';
 import 'package:app/model/chapter_status.dart';

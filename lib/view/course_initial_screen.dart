@@ -1,5 +1,4 @@
 import 'package:app/service/badge_service.dart';
-import 'package:app/service/user_course_service.dart';
 import 'package:app/utils/colors.dart';
 import 'package:app/view/course_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +9,6 @@ import '../model/badge.dart';
 import '../model/chapter.dart';
 import '../model/course.dart';
 import '../service/course_service.dart';
-import 'main_screen.dart';
 
 class CourseInitialScreen extends StatefulWidget {
   final int id;

@@ -13,7 +13,6 @@ import '../service/course_service.dart';
 import '../service/user_service.dart';
 import '../utils/colors.dart';
 import 'login_screen.dart';
-import 'main_screen.dart';
 
 class Homescreen extends StatefulWidget {
   final Function(int) updateIndex;

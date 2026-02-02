@@ -5,11 +5,9 @@ import 'package:app/service/user_service.dart';
 import 'package:app/utils/colors.dart';
 import 'package:app/view/main_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 

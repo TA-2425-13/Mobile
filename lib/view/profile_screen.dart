@@ -17,7 +17,6 @@ import '../model/user.dart';
 import '../service/course_service.dart';
 import '../utils/colors.dart';
 import 'login_screen.dart';
-import 'main_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

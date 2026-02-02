@@ -4,8 +4,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:app/model/assignment.dart';
 import 'package:app/model/chapter_status.dart';
-import 'package:app/model/learning_material.dart';
-import 'package:app/model/user_course.dart';
 import 'package:app/service/badge_service.dart';
 import 'package:app/service/chapter_service.dart';
 import 'package:app/service/user_chapter_service.dart';
@@ -17,20 +15,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_file_downloader/flutter_file_downloader.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../model/assignment.dart';
-import '../model/chapter_status.dart';
-import '../model/learning_material.dart';
-import '../service/badge_service.dart';
-import '../service/chapter_service.dart';
-import '../service/user_chapter_service.dart';
 import '../service/user_course_service.dart';
-import '../service/user_service.dart';
-import '../utils/colors.dart';
 import 'congratulation_screen.dart';
 
 class AssignmentScreen extends StatefulWidget {

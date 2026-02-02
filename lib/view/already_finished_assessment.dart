@@ -5,8 +5,6 @@ import '../model/assessment.dart';
 import '../model/chapter_status.dart';
 import '../model/user.dart';
 import '../service/chapter_service.dart';
-import '../service/user_chapter_service.dart';
-import '../service/user_service.dart';
 import '../utils/colors.dart';
 
 class AlreadyFinishedAssessmentAssessmentScreen extends StatefulWidget {
