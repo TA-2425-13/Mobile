@@ -1,14 +1,16 @@
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 
-import '../model/assessment.dart';
-import '../model/chapter_status.dart';
-import '../model/user.dart';
-import '../service/chapter_service.dart';
-import '../service/user_chapter_service.dart';
-import '../service/user_service.dart';
-import '../utils/colors.dart';
+import 'package:app/global_var.dart';
+import 'package:app/model/assessment.dart';
+import 'package:app/model/chapter_status.dart';
+import 'package:app/model/user.dart';
+import 'package:app/service/chapter_service.dart';
+import 'package:app/service/user_chapter_service.dart';
+import 'package:app/utils/colors.dart';
 
 class AssessmentScreen extends StatefulWidget {
   final ChapterStatus status;
@@ -44,14 +46,16 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   bool assessmentDone = false;
   bool allQuestionsAnswered = false;
   int correctAnswer = 0;
-  int point = 0;
-  bool _postAssessmentDialogShown = false;
+  int _grade = 0;
+  int _pointsEarned = 0;
+  String? _aiFeedback;
+  String? _newDifficultyLabel;
+  bool _isSubmitting = false;
   Student? user;
   late ChapterStatus status;
   Assessment? question;
-  PageController _pageController = PageController();
+  final PageController _pageController = PageController();
   int _currentPage = 0;
-  bool _calculateComplete = false;
 
   @override
   void initState() {
@@ -60,6 +64,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     assessmentDone = widget.status.assessmentDone;
     status = widget.status;
     user = widget.user;
+    _assessmentFinished = assessmentDone;
+    tapped = assessmentDone;
+    _grade = status.assessmentGrade;
     super.initState();
   }
 
@@ -67,6 +74,34 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     final resultAssessment = await ChapterService.getAssessmentByChapterId(id);
     setState(() {
       question = resultAssessment;
+    });
+    if (assessmentDone) {
+      _prefillCompletedAnswers();
+    }
+  }
+
+  void _prefillCompletedAnswers() {
+    if (question == null || status.assessmentAnswer.isEmpty) {
+      return;
+    }
+
+    int tempCorrect = 0;
+    for (int index = 0; index < question!.questions.length; index++) {
+      if (index >= status.assessmentAnswer.length) {
+        break;
+      }
+      final answer = status.assessmentAnswer[index];
+      question!.questions[index].selectedAnswer = answer;
+      final isCorrect = answer.trim().toLowerCase() ==
+          question!.questions[index].correctedAnswer.trim().toLowerCase();
+      question!.questions[index].isCorrect = isCorrect;
+      if (isCorrect) {
+        tempCorrect++;
+      }
+    }
+
+    setState(() {
+      correctAnswer = tempCorrect;
     });
   }
 
@@ -158,11 +193,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 ),
                 onPressed: () {
                   if(allQuestionsAnswered) {
-                    setState(() {
-                      tapped = true;
-                    });
-                    _showQuizResults();
                     Navigator.pop(context);
+                    _submitAssessment();
                   } else {
                     Navigator.pop(context);
                   }
@@ -180,98 +212,148 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     );
   }
 
-  Future<int> getScore() async {
-    int score = 0;
-    double rangeScore = 100 / question!.questions.length;
-    int tempCorrectAnswer = 0; // Temporary counter for correctAnswer
-
-    for (int index = 0; index < question!.questions.length; index++) {
-      Question i = question!.questions[index]; // Ambil elemen berdasarkan index
-
-      if (i.type == 'PG' || i.type == 'TF' || i.type == 'MC') {
-        if (i.isCorrect) {
-          question!.questions[index].score = rangeScore.ceil();
-          score += rangeScore.ceil();
-          tempCorrectAnswer++;
-        }
-      } else if (i.type == 'EY') {
-        int fullscore = rangeScore.ceil();
-        try {
-          double similarity = double.parse((await checkEssay(i.correctedAnswer, i.selectedAnswer)).toStringAsFixed(1));
-          if (similarity > 0) {
-            question!.questions[index].score = (fullscore * similarity).ceil();
-            score += (fullscore * similarity).ceil();
-            question!.questions[index].isCorrect = true;
-            tempCorrectAnswer++;
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print("Error processing essay at index $index: $e");
-          }
-        }
-      }
+  Future<void> _submitAssessment() async {
+    if (question == null || user == null || _isSubmitting) {
+      return;
     }
 
-    // Update state once after all calculations
+    final answersPayload = question!.questions.asMap().entries.map((entry) {
+      final selected = entry.value.selectedAnswer.isNotEmpty
+          ? entry.value.selectedAnswer
+          : entry.value.selectedMultAnswer.join(', ');
+      return {
+        'index': entry.key,
+        'answer': selected,
+      };
+    }).toList();
+
+    final payload = {
+      'userId': user!.id,
+      'chapterId': status.chapterId,
+      'answers': answersPayload,
+    };
+
     setState(() {
-      correctAnswer = tempCorrectAnswer;
+      _isSubmitting = true;
     });
 
-    return score;
-  }
-
-  Future<void> calculateScore() async {
-    int finalScore = await getScore();
-    setState(() {
-      point = finalScore > 100 ? 100 : finalScore;
-      _calculateComplete = true;
-    });
-  }
-
-  void _showQuizResults() async{
-    if (allQuestionsAnswered && tapped) {
-      await calculateScore();
-      if(_calculateComplete) {
-        if(!widget.status.assessmentDone && !assessmentDone){
-          setState(() {
-            user!.points = user!.points! + point;
-          });
-          assessmentDone = true;
-          status.assessmentGrade = point;
-        }
-
-        if (question!.answers == null) {
-          question!.answers = [];
-        }
-        for (var q in question!.questions) {
-          question!.answers!.add(q.selectedAnswer);
-        }
-        status.assessmentDone = true;
-        status.assessmentAnswer = question!.answers!;
-        updateUserPoints();
-      }
-      widget.updateStatus(status);
-      updateStatus();
-      setState(() {
-        _assessmentFinished = true;
-        widget.updateAssessmentFinished(_assessmentFinished);
-        widget.updateAssessmentStarted(false);
-        widget.updateMaterialLocked(false);
+    bool loaderVisible = false;
+    if (mounted) {
+      loaderVisible = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      ).then((_) {
+        loaderVisible = false;
       });
     }
+
+    try {
+      final response = await http.post(
+        Uri.parse('${GlobalVar.baseUrl}/assessment/submit'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode != 200) {
+        final body = jsonDecode(response.body);
+        throw Exception(body['message'] ?? 'Gagal mengirim jawaban assessment');
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      _applySubmissionResult(data);
+    } catch (error) {
+      _showSubmissionError(error.toString());
+    } finally {
+      if (loaderVisible && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
-  Future<void> updateUserPoints() async {
-    await UserService.updateUserPoints(user!);
+  void _applySubmissionResult(Map<String, dynamic> data) {
+    if (question == null) {
+      return;
+    }
+
+    final evaluations = data['evaluations'] as List<dynamic>?;
+    final answers = question!.questions.map((q) => q.selectedAnswer).toList();
+
+    setState(() {
+      _grade = (data['grade'] ?? 0) as int;
+      _pointsEarned = (data['pointsEarned'] ?? 0) as int;
+      _aiFeedback = data['aiFeedback'] as String?;
+      _newDifficultyLabel = data['newDifficulty']?.toString();
+      correctAnswer = (data['correctAnswers'] ?? correctAnswer) as int;
+      assessmentDone = true;
+      status.assessmentDone = true;
+      status.assessmentGrade = _grade;
+      status.assessmentAnswer = answers;
+      allQuestionsAnswered = true;
+      tapped = true;
+      _assessmentFinished = true;
+      user?.points = (user?.points ?? 0) + _pointsEarned;
+    });
+
+    _applyEvaluationsToQuestions(evaluations);
+
+    widget.updateStatus(status);
+    widget.updateAssessmentFinished(true);
+    widget.updateAssessmentStarted(false);
+    widget.updateMaterialLocked(false);
+    updateStatus();
+  }
+
+  void _applyEvaluationsToQuestions(List<dynamic>? evaluations) {
+    if (question == null || evaluations == null) {
+      return;
+    }
+
+    for (final evaluation in evaluations) {
+      if (evaluation is! Map<String, dynamic>) {
+        continue;
+      }
+      final index = evaluation['index'];
+      if (index is! int || index < 0 || index >= question!.questions.length) {
+        continue;
+      }
+      final submitted = (evaluation['submittedAnswer'] ?? '').toString();
+      final isCorrect = evaluation['isCorrect'] == true;
+      question!.questions[index].selectedAnswer = submitted;
+      question!.questions[index].isCorrect = isCorrect;
+      question!.questions[index].score = isCorrect
+          ? (100 / question!.questions.length).ceil()
+          : 0;
+    }
+  }
+
+  void _showSubmissionError(String message) {
+    if (!mounted) {
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Gagal Mengirim Jawaban'),
+        content: Text(message, style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tutup'),
+          )
+        ],
+      ),
+    );
   }
 
   Future<void> updateStatus() async {
     status = await UserChapterService.updateChapterStatus(status.id, status);
-  }
-
-  Future<double> checkEssay(String reference, String answer) async{
-    double similiarity = await ChapterService.checkSimiliarity(reference, answer);
-    return similiarity;
   }
 
   @override
@@ -839,7 +921,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.all(0),
-                                    child: Text(': $point / ${((question!.questions.length/question!.questions.length)*100).toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
+                                    child: Text(': $_grade / 100', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
                                   ),
                                 ],
                               ),
@@ -851,7 +933,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.all(0),
-                                    child: Text(': +$point', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
+                                    child: Text(': +$_pointsEarned', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
                                   ),
                                 ],
                               ),
@@ -863,6 +945,49 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   ),
                 ),
               ),
+              if (_newDifficultyLabel != null) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Card(
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.trending_up, color: Colors.deepPurple),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Tingkat kesulitan berikutnya: $_newDifficultyLabel',
+                              style: const TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              if (_aiFeedback != null) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Masukan AI', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded')),
+                          const SizedBox(height: 8),
+                          Text(_aiFeedback!, style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               SizedBox(height: 8),
               Column(
                 children: List.generate(

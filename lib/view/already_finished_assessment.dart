@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../model/assessment.dart';
-import '../model/chapter_status.dart';
-import '../model/user.dart';
-import '../service/chapter_service.dart';
-import '../utils/colors.dart';
+import 'package:app/model/assessment.dart';
+import 'package:app/model/chapter_status.dart';
+import 'package:app/model/user.dart';
+import 'package:app/service/chapter_service.dart';
+import 'package:app/utils/colors.dart';
 
 class AlreadyFinishedAssessmentAssessmentScreen extends StatefulWidget {
   final ChapterStatus status;

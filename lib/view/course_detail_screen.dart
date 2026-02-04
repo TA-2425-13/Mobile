@@ -1,5 +1,4 @@
 import 'package:app/model/chapter.dart';
-import 'package:app/main.dart';
 import 'package:app/model/chapter_status.dart';
 import 'package:app/service/badge_service.dart';
 import 'package:app/service/course_service.dart';
@@ -10,12 +9,12 @@ import 'package:flutter/material.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../model/badge.dart';
-import '../model/course.dart';
-import '../model/user.dart';
-import '../model/user_course.dart';
-import '../utils/colors.dart';
-import 'chapter_screen.dart';
+import 'package:app/model/badge.dart';
+import 'package:app/model/course.dart';
+import 'package:app/model/user.dart';
+import 'package:app/model/user_course.dart';
+import 'package:app/utils/colors.dart';
+import 'package:app/view/chapter_screen.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final int id;
@@ -171,10 +170,10 @@ class _CourseDetail extends State<CourseDetailScreen> {
             automaticallyImplyLeading: false,
             centerTitle: true,
             title: Column(
-              crossAxisAlignment: CrossAxisAlignment.center ,
-              spacing: 4,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text('Level', style: TextStyle(fontFamily: 'DIN_Next_Rounded'),),
+                Text('Level', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                const SizedBox(height: 4),
                 Text(
                   courseDetail!.courseName,
                   style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),
@@ -264,7 +263,7 @@ class _CourseDetail extends State<CourseDetailScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            color: purple,
+            color: AppColors.primaryColor,
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: () async {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 
-import '../model/chapter_status.dart';
-import '../model/learning_material.dart';
-import '../service/chapter_service.dart';
-import '../service/user_chapter_service.dart';
-import '../utils/colors.dart';
+import 'package:app/model/chapter_status.dart';
+import 'package:app/model/learning_material.dart';
+import 'package:app/service/chapter_service.dart';
+import 'package:app/service/user_chapter_service.dart';
+import 'package:app/utils/colors.dart';
 
 class MaterialScreen extends StatefulWidget {
   final ChapterStatus status;
