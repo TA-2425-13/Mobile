@@ -16,11 +16,21 @@ class GlobalVar {
   static const Color secondaryColor = Color.fromARGB(255, 26, 173, 33);
   static const Color accentColor = Color.fromARGB(255, 221, 200, 255);
 
-  // Use Android emulator loopback when needed, otherwise fall back to localhost.
+  // Use dart-define override when provided, otherwise fall back to sensible defaults.
   static String _resolveBaseUrl() {
+    const envBaseUrl = String.fromEnvironment('LEVLEARN_API_BASE_URL');
+    if (envBaseUrl.isNotEmpty) {
+      return envBaseUrl;
+    }
+
+    if (kReleaseMode) {
+      return 'https://backend-65ah.vercel.app/api';
+    }
+
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:7000/api';
     }
+
     return 'http://127.0.0.1:7000/api';
   }
 }
