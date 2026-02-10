@@ -12,6 +12,7 @@ import '../service/badge_service.dart';
 import '../service/course_service.dart';
 import '../service/user_service.dart';
 import '../utils/colors.dart';
+import 'chatbot_screen.dart';
 import 'login_screen.dart';
 
 class Homescreen extends StatefulWidget {
@@ -286,6 +287,7 @@ class _HomeState extends State<Homescreen> {
                           children: [
                             SizedBox(height: 30,),
                             _buildProfile(),
+                            _buildChatShortcut(),
                             _buildStats(),
                             _buildMyProgress(),
                             _buildMore(),
@@ -548,6 +550,60 @@ class _HomeState extends State<Homescreen> {
             ),
           )
         ],
+      ),
+    );
+  }
+
+  Widget _buildChatShortcut() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ChatbotScreen()),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 6,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.chat_bubble_outline, size: 28, color: Colors.white),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Levely Chat',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: 'DIN_Next_Rounded',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ngobrol dengan Levely untuk bantu jawab pertanyaanmu.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white70,
+                      fontFamily: 'DIN_Next_Rounded',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.white),
+          ],
+        ),
       ),
     );
   }

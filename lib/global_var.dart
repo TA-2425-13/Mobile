@@ -1,5 +1,4 @@
 import 'dart:ui';
-import 'package:flutter/foundation.dart';
 
 class GlobalVar {
   static final GlobalVar _instance = GlobalVar._internal();

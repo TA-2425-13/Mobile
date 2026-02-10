@@ -1,27 +1,99 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/utils/colors.dart';
-import 'package:app/view/chatbot_screen.dart';
+import 'package:app/view/login_screen.dart';
+import 'package:app/view/main_screen.dart';
+import 'package:app/view/onboarding_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ChatOnlyApp());
+  runApp(const LevelyApp());
 }
 
-class ChatOnlyApp extends StatelessWidget {
-  const ChatOnlyApp({super.key});
+class LevelyApp extends StatelessWidget {
+  const LevelyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Levely Chat',
+      title: 'Levelearn',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primaryColor),
         scaffoldBackgroundColor: Colors.white,
         useMaterial3: true,
       ),
-      home: const ChatbotScreen(),
+      home: const _BootstrapScreen(),
     );
   }
 }
+
+class _BootstrapScreen extends StatefulWidget {
+  const _BootstrapScreen({super.key});
+
+  @override
+  State<_BootstrapScreen> createState() => _BootstrapScreenState();
+}
+
+class _BootstrapScreenState extends State<_BootstrapScreen> {
+  late final Future<_InitialDestination> _initialDestinationFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialDestinationFuture = _resolveInitialDestination();
+  }
+
+  Future<_InitialDestination> _resolveInitialDestination() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstLaunch = prefs.getBool('firstLaunch') ?? true;
+    if (isFirstLaunch) {
+      return _InitialDestination.onboarding;
+    }
+
+    final hasSession = (prefs.getInt('userId') != null) &&
+        ((prefs.getString('token') ?? '').isNotEmpty);
+
+    return hasSession
+        ? _InitialDestination.mainApp
+        : _InitialDestination.login;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_InitialDestination>(
+      future: _initialDestinationFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Text(
+                'Gagal memuat aplikasi',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          );
+        }
+
+        switch (snapshot.data) {
+          case _InitialDestination.mainApp:
+            return const Mainscreen();
+          case _InitialDestination.login:
+            return const LoginScreen();
+          case _InitialDestination.onboarding:
+          default:
+            return const OnboardingScreen();
+        }
+      },
+    );
+  }
+}
+
+enum _InitialDestination { onboarding, login, mainApp }
