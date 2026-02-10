@@ -18,20 +18,12 @@ class GlobalVar {
 
   // Use dart-define override when provided, otherwise fall back to sensible defaults.
   static String _resolveBaseUrl() {
-    const envBaseUrl = String.fromEnvironment('LEVLEARN_API_BASE_URL');
+    const envBaseUrl = String.fromEnvironment('LEVELEARN_API_BASE_URL');
     if (envBaseUrl.isNotEmpty) {
       return envBaseUrl;
     }
 
-    if (kReleaseMode) {
-      return 'https://backend-65ah.vercel.app/api';
-    }
-
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:7000/api';
-    }
-
-    return 'http://127.0.0.1:7000/api';
+    return 'https://backend-65ah.vercel.app/api';
   }
 }
 
