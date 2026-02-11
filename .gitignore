@@ -32,6 +32,9 @@ build/
 *.ipa
 .env
 
+# Firebase credentials
+secrets/
+
 .flutter-plugins
 .flutter-plugins-dependencies
 .metadata
