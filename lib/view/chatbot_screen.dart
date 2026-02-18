@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/global_var.dart';
 import 'package:app/utils/colors.dart';
+import 'package:app/view/chat_session_api.dart';
 
 class ChatMessage {
   final String content;
@@ -15,7 +17,8 @@ class ChatMessage {
 }
 
 class ChatbotScreen extends StatefulWidget {
-  const ChatbotScreen({super.key});
+  final bool startFresh;
+  const ChatbotScreen({super.key, this.startFresh = false});
 
   @override
   State<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -23,6 +26,14 @@ class ChatbotScreen extends StatefulWidget {
 
 class _ChatbotScreenState extends State<ChatbotScreen> {
   static const _sessionPrefsKey = 'levely_chat_session_id';
+  static const _fallbackAssistantReply = 'Maaf, aku belum bisa menjawab.';
+  static const List<String> _thinkingPlaceholders = [
+    'Levely lagi mikir sebentar…',
+    'Sebentar ya, aku susun jawabannya dulu.',
+    'Tunggu bentar, aku lagi nyari contoh terbaik.',
+    'Give me a sec, lagi loading ide.',
+    'Hmm... biar aku mikir dikit biar jawabannya mantap.',
+  ];
 
   final List<ChatMessage> _messages = [];
   final List<Map<String, String>> _history = [];
@@ -30,13 +41,24 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   bool _isSending = false;
   bool _isLoadingHistory = false;
+  bool _isLoadingSessions = false;
   int? _userId;
   String? _sessionId;
+  int? _activeStreamIndex;
+  bool _streamHasProducedContent = false;
+  final Random _random = Random();
+  String? _currentPlaceholder;
+  List<ChatSession> _sessions = [];
 
   @override
   void initState() {
     super.initState();
-    _restoreSession();
+    _initializeChat();
+  }
+
+  Future<void> _initializeChat() async {
+    await _restoreSession();
+    await _fetchSessions();
   }
 
   @override
@@ -47,7 +69,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   Future<void> _restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
-    final storedSessionId = prefs.getString(_sessionPrefsKey);
     final storedUserId = prefs.getInt('userId');
 
     if (!mounted) {
@@ -56,6 +77,24 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     setState(() {
       _userId = storedUserId;
+    });
+
+    if (widget.startFresh) {
+      setState(() {
+        _sessionId = null;
+        _messages.clear();
+        _history.clear();
+      });
+      return;
+    }
+
+    final storedSessionId = prefs.getString(_sessionPrefsKey);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
       _sessionId = (storedSessionId != null && storedSessionId.isNotEmpty)
         ? storedSessionId
         : null;
@@ -172,6 +211,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     setState(() {
       _sessionId = next;
     });
+
+    // Refresh the drawer list so the new session appears
+    await _fetchSessions();
   }
 
   Future<void> _clearPersistedSession() async {
@@ -243,60 +285,217 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       return;
     }
 
+    late final int assistantIndex;
+
+    final placeholder = _pickThinkingPlaceholder();
+
     setState(() {
       _messages.add(ChatMessage(content: text, isUser: true));
       _addToHistory(isUser: true, content: text);
       _controller.clear();
       _isSending = true;
+      _messages.add(ChatMessage(content: placeholder, isUser: false));
+      assistantIndex = _messages.length - 1;
+      _activeStreamIndex = assistantIndex;
+      _streamHasProducedContent = false;
+      _currentPlaceholder = placeholder;
     });
 
     try {
-      final response = await http.post(
-        Uri.parse('${GlobalVar.baseUrl}/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'message': text,
-          'history': _history,
-          'sessionId': _sessionId,
-          'userId': _userId,
-        }),
+      final reply = await _streamAssistantReply(
+        prompt: text,
+        assistantIndex: assistantIndex,
       );
-
-      if (response.statusCode != 200) {
-        throw Exception('Gagal menghubungi server');
-      }
-
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final reply = (body['reply'] ?? '').toString().trim();
-      final normalizedReply =
-        reply.isEmpty ? 'Maaf, aku belum bisa menjawab.' : reply;
-
-      await _persistSessionId(body['sessionId']?.toString());
 
       if (!mounted) {
         return;
       }
 
+      final normalizedReply = reply.trim().isEmpty
+        ? _fallbackAssistantReply
+        : reply.trim();
+
       setState(() {
-        _messages.add(ChatMessage(content: normalizedReply, isUser: false));
+        _messages[assistantIndex] =
+          ChatMessage(content: normalizedReply, isUser: false);
         _addToHistory(isUser: false, content: normalizedReply);
+        _activeStreamIndex = null;
+        _streamHasProducedContent = false;
+        _currentPlaceholder = null;
       });
     } catch (error) {
       if (!mounted) {
         return;
       }
 
+      final message = 'Terjadi kesalahan: ${error.toString()}';
       setState(() {
-        _messages.add(ChatMessage(
-          content: 'Terjadi kesalahan: ${error.toString()}', isUser: false));
+        _messages[assistantIndex] =
+          ChatMessage(content: message, isUser: false);
+        _activeStreamIndex = null;
+        _streamHasProducedContent = false;
+        _currentPlaceholder = null;
       });
     } finally {
       if (mounted) {
         setState(() {
           _isSending = false;
+          if (_activeStreamIndex == assistantIndex) {
+            _activeStreamIndex = null;
+            _currentPlaceholder = null;
+          }
         });
       }
+      // Refresh sessions to update titles if generated
+      if (_sessionId != null) {
+        _fetchSessions();
+      }
     }
+  }
+
+  Future<String> _streamAssistantReply({
+    required String prompt,
+    required int assistantIndex,
+  }) async {
+    final client = http.Client();
+    final uri = Uri.parse('${GlobalVar.baseUrl}/chat/stream');
+    final request = http.Request('POST', uri)
+      ..headers['Content-Type'] = 'application/json'
+      ..body = jsonEncode({
+        'message': prompt,
+        'history': _history,
+        'sessionId': _sessionId,
+        'userId': _userId,
+      });
+
+    try {
+      final response = await client.send(request);
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal menghubungi server (${response.statusCode})');
+      }
+
+      final contentType = response.headers['content-type'] ?? '';
+
+      if (!contentType.toLowerCase().contains('text/event-stream')) {
+        final bodyText = await response.stream.bytesToString();
+        if (bodyText.isEmpty) {
+          return '';
+        }
+        final parsed = jsonDecode(bodyText) as Map<String, dynamic>;
+        final reply = (parsed['reply'] ?? '').toString();
+        final sessionValue = parsed['sessionId']?.toString();
+        if (sessionValue != null && sessionValue.isNotEmpty) {
+          await _persistSessionId(sessionValue);
+        }
+        return reply;
+      }
+
+      String replyBuffer = '';
+      final lineStream = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+      await for (final rawLine in lineStream) {
+        final trimmedLine = rawLine.trim();
+        if (trimmedLine.isEmpty) {
+          continue;
+        }
+        if (!trimmedLine.startsWith('data:')) {
+          continue;
+        }
+        final dataPayload = trimmedLine.substring(5).trim();
+        if (dataPayload.isEmpty) {
+          continue;
+        }
+        if (dataPayload == '[DONE]') {
+          break;
+        }
+
+        Map<String, dynamic> payload;
+        try {
+          payload = jsonDecode(dataPayload) as Map<String, dynamic>;
+        } catch (_) {
+          continue;
+        }
+
+        final errorPayload = payload['error'];
+        if (errorPayload != null) {
+          throw Exception(errorPayload.toString());
+        }
+
+        final delta = payload['delta']?.toString();
+        if (delta != null && delta.isNotEmpty) {
+          replyBuffer += delta;
+          _updateAssistantMessage(assistantIndex, replyBuffer);
+        }
+
+        final replyValue = payload['reply']?.toString();
+        if (replyValue != null && replyValue.isNotEmpty) {
+          replyBuffer = replyValue;
+          _updateAssistantMessage(assistantIndex, replyBuffer);
+        }
+
+        final sessionValue = payload['sessionId']?.toString();
+        if (sessionValue != null && sessionValue.isNotEmpty) {
+          await _persistSessionId(sessionValue);
+        }
+      }
+
+      return replyBuffer;
+    } finally {
+      client.close();
+    }
+  }
+
+  void _updateAssistantMessage(int index, String content) {
+    if (!mounted || index < 0 || index >= _messages.length) {
+      return;
+    }
+
+    setState(() {
+      final trimmed = content.trim();
+      if (_activeStreamIndex == index &&
+          trimmed.isNotEmpty &&
+          trimmed != (_currentPlaceholder ?? '')) {
+        _streamHasProducedContent = true;
+      }
+      _messages[index] = ChatMessage(content: content, isUser: false);
+    });
+  }
+
+  String _pickThinkingPlaceholder() {
+    if (_thinkingPlaceholders.isEmpty) {
+      return 'Levely lagi mikir sebentar…';
+    }
+    final index = _random.nextInt(_thinkingPlaceholders.length);
+    return _thinkingPlaceholders[index];
+  }
+
+  Future<void> _fetchSessions() async {
+    if (_userId == null) return;
+    setState(() => _isLoadingSessions = true);
+    final sessions = await ChatSessionApi.fetchSessions(_userId!);
+    if (!mounted) return;
+    setState(() {
+      _sessions = sessions;
+      _isLoadingSessions = false;
+    });
+  }
+
+  Future<void> _createNewSession() async {
+    setState(() {
+      _sessionId = null;
+      _messages.clear();
+      _history.clear();
+    });
+    Navigator.pop(context); // Close the drawer
+  }
+
+  void _onSelectSession(ChatSession session) async {
+    await _persistSessionId(session.id);
+    await _fetchHistory(session.id);
+    setState(() {});
   }
 
   @override
@@ -307,6 +506,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         backgroundColor: AppColors.primaryColor,
         title: const Text('Levely Chat', style: TextStyle(color: Colors.white)),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Sessions',
+            onPressed: _fetchSessions,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -347,19 +553,33 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                               : const Radius.circular(16),
                           ),
                         ),
-                        child: message.isUser
-                          ? Text(
-                            message.content,
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              color: textColor,
-                              fontFamily: 'DIN_Next_Rounded',
-                              height: 1.4,
-                            ),
-                          )
-                        : _FormattedMessage(
-                          text: message.content,
-                          color: textColor,
+                        child: Column(
+                          crossAxisAlignment: message.isUser
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                          children: [
+                            message.isUser
+                              ? Text(
+                                message.content,
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontFamily: 'DIN_Next_Rounded',
+                                  height: 1.4,
+                                ),
+                              )
+                              : _FormattedMessage(
+                                text: message.content,
+                                color: textColor,
+                              ),
+                            if (!message.isUser &&
+                                index == _activeStreamIndex &&
+                                !_streamHasProducedContent)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 6),
+                                child: _TypingIndicator(),
+                              ),
+                          ],
                         ),
                       ),
                     ],
@@ -406,6 +626,160 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           )
         ],
       ),
+      drawer: Drawer(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.add),
+                title: const Text('Chat Baru'),
+                onTap: _createNewSession,
+              ),
+              const Divider(),
+              if (_isLoadingSessions)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              if (!_isLoadingSessions && _sessions.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('Belum ada sesi chat.'),
+                ),
+              if (!_isLoadingSessions)
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _sessions.length,
+                    itemBuilder: (context, index) {
+                      final session = _sessions[index];
+                      final isActive = session.id == _sessionId;
+                      return ListTile(
+                        title: Text(session.title?.isNotEmpty == true ? session.title! : 'Sesi ${index + 1}'),
+                        selected: isActive,
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _onSelectSession(session);
+                        },
+                        onLongPress: () => _showSessionOptions(session),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSessionOptions(ChatSession session) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Ubah Nama'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showRenameDialog(session);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Hapus Chat', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDeleteSession(session);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showRenameDialog(ChatSession session) {
+    final titleController = TextEditingController(text: session.title);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Ubah Nama Sesi'),
+          content: TextField(
+            controller: titleController,
+            decoration: const InputDecoration(hintText: 'Nama baru...'),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final newTitle = titleController.text.trim();
+                if (newTitle.isNotEmpty) {
+                  Navigator.pop(context);
+                  final success = await ChatSessionApi.renameSession(session.id, newTitle);
+                  if (success) {
+                    _fetchSessions();
+                    _showSnack('Berhasil mengubah nama sesi');
+                  } else {
+                    _showSnack('Gagal mengubah nama sesi');
+                  }
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteSession(ChatSession session) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Hapus Chat?'),
+          content: const Text('Riwayat chat ini akan dihapus permanen.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              onPressed: () async {
+                Navigator.pop(context);
+                final success = await ChatSessionApi.deleteSession(session.id);
+                if (success) {
+                  if (session.id == _sessionId) {
+                    // If deleted session was active, reset to fresh state
+                    setState(() {
+                      _sessionId = null;
+                      _messages.clear();
+                      _history.clear();
+                    });
+                  }
+                  _fetchSessions();
+                  _showSnack('Sesi chat dihapus');
+                } else {
+                  _showSnack('Gagal menghapus sesi');
+                }
+              },
+              child: const Text('Hapus'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -646,6 +1020,52 @@ class _FormattedMessage extends StatelessWidget {
       return token.substring(1, token.length - 1);
     }
     return token;
+  }
+}
+
+class _TypingIndicator extends StatefulWidget {
+  const _TypingIndicator();
+
+  @override
+  State<_TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        final activeDots = 1 + ((_controller.value * 3).floor() % 3);
+        final text = List.filled(activeDots, '•').join(' ');
+        return Text(
+          text,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black54,
+            letterSpacing: 2,
+          ),
+        );
+      },
+    );
   }
 }
 

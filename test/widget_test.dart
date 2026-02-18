@@ -6,14 +6,14 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 
 import 'package:app/main.dart';
 
 void main() {
-  testWidgets('ChatOnlyApp renders empty chat state', (tester) async {
-    await tester.pumpWidget(const ChatOnlyApp());
+  testWidgets('LevelyApp renders initial screen', (tester) async {
+    await tester.pumpWidget(const LevelyApp());
 
-    expect(find.text('Levely Chat'), findsOneWidget);
-    expect(find.text('Mulai ngobrol dengan Levely!'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 }

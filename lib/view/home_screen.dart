@@ -13,6 +13,7 @@ import '../service/course_service.dart';
 import '../service/user_service.dart';
 import '../utils/colors.dart';
 import 'chatbot_screen.dart';
+import 'package:app/view/chat_screen.dart';
 import 'login_screen.dart';
 
 class Homescreen extends StatefulWidget {
@@ -561,7 +562,7 @@ class _HomeState extends State<Homescreen> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const ChatbotScreen()),
+            MaterialPageRoute(builder: (context) => const ChatbotScreen(startFresh: true)),
           );
         },
         style: ElevatedButton.styleFrom(
