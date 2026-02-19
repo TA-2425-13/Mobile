@@ -18,7 +18,7 @@ class ChatSession {
 
 class ChatSessionApi {
   static Future<List<ChatSession>> fetchSessions(int userId) async {
-    final url = Uri.parse('${GlobalVar.baseUrl}/chat/session/user/$userId');
+    final url = Uri.parse('${GlobalVar.baseUrl}/chat/session/user/$userId?t=${DateTime.now().millisecondsSinceEpoch}');
     final response = await http.get(url);
     if (response.statusCode != 200) return [];
     final Map<String, dynamic> body = jsonDecode(response.body);
