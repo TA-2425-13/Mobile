@@ -288,7 +288,7 @@ class _HomeState extends State<Homescreen> {
                           children: [
                             SizedBox(height: 30,),
                             _buildProfile(),
-                            _buildChatShortcut(),
+                            // _buildChatShortcut(),
                             _buildStats(),
                             _buildMyProgress(),
                             _buildMore(),
