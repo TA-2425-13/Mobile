@@ -8,7 +8,6 @@ pubspec.lock
 android/.gradle/
 android/build/
 android/app/build/
-android/app/google-services.json
 *.keystore
 
 # iOS related
