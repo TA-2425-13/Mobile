@@ -18,7 +18,8 @@ class ChatMessage {
 
 class ChatbotScreen extends StatefulWidget {
   final bool startFresh;
-  const ChatbotScreen({super.key, this.startFresh = false});
+  final int? materialId;
+  const ChatbotScreen({super.key, this.startFresh = false, this.materialId});
 
   @override
   State<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -366,6 +367,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         'history': _history,
         'sessionId': _sessionId,
         'userId': _userId,
+        if (widget.materialId != null) 'materialId': widget.materialId,
       });
 
     try {
