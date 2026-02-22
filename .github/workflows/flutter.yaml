@@ -18,6 +18,20 @@ jobs:
         with:
           flutter-version: 3.35.4
           channel: 'stable'
+          cache: true
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache/hosted
+            ~/.pub-cache/git
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
 
       - name: Install dependencies
         run: flutter pub get
