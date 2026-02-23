@@ -57,14 +57,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pub-
 
+      - name: Clean Flutter
+        run: flutter clean
+
       - name: Install dependencies
         run: flutter pub get
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-      - name: Clean Flutter
-        run: flutter clean
 
       - name: Build APK
         run: flutter build apk --release
