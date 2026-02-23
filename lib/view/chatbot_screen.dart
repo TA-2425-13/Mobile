@@ -196,7 +196,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     await _persistSessionId(sessionCandidate);
   }
 
-  Future<void> _persistSessionId(String? value) async {
+  Future<void> _persistSessionId(String? value, {bool skipFetch = false}) async {
     final next = value?.trim();
     if (next == null || next.isEmpty || next.toLowerCase() == 'null' || next == _sessionId) {
       return;
@@ -211,10 +211,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     setState(() {
       _sessionId = next;
+      if (skipFetch && !_sessions.any((s) => s.id == next)) {
+        // Manually insert placeholder so the stream can start typing into it
+        _sessions.insert(0, ChatSession(id: next, title: ''));
+      }
     });
 
-    // Refresh the drawer list so the new session appears
-    await _fetchSessions();
+    if (!skipFetch) {
+      await _fetchSessions();
+    }
   }
 
   Future<void> _clearPersistedSession() async {
@@ -388,7 +393,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         final reply = (parsed['reply'] ?? '').toString();
         final sessionValue = parsed['sessionId']?.toString();
         if (sessionValue != null && sessionValue.isNotEmpty) {
-          await _persistSessionId(sessionValue);
+          await _persistSessionId(sessionValue, skipFetch: true);
         }
         return reply;
       }
@@ -426,6 +431,16 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           throw Exception(errorPayload.toString());
         }
 
+        final titleDelta = payload['titleDelta']?.toString();
+        if (titleDelta != null && titleDelta.isNotEmpty) {
+          _updateSessionTitleStream(titleDelta);
+        }
+
+        final titleValue = payload['title']?.toString();
+        if (titleValue != null && titleValue.isNotEmpty) {
+          _updateSessionTitleFinal(titleValue);
+        }
+
         final delta = payload['delta']?.toString();
         if (delta != null && delta.isNotEmpty) {
           replyBuffer += delta;
@@ -440,7 +455,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
         final sessionValue = payload['sessionId']?.toString();
         if (sessionValue != null && sessionValue.isNotEmpty) {
-          await _persistSessionId(sessionValue);
+          await _persistSessionId(sessionValue, skipFetch: true);
         }
       }
 
@@ -463,6 +478,31 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         _streamHasProducedContent = true;
       }
       _messages[index] = ChatMessage(content: content, isUser: false);
+    });
+  }
+
+  void _updateSessionTitleStream(String delta) {
+    if (!mounted || _sessionId == null) return;
+    setState(() {
+      final index = _sessions.indexWhere((s) => s.id == _sessionId);
+      if (index != -1) {
+        final currentTitle = _sessions[index].title ?? '';
+        _sessions[index] = _sessions[index].copyWith(title: currentTitle + delta);
+      } else {
+        _sessions.insert(0, ChatSession(id: _sessionId!, title: delta));
+      }
+    });
+  }
+
+  void _updateSessionTitleFinal(String title) {
+    if (!mounted || _sessionId == null) return;
+    setState(() {
+      final index = _sessions.indexWhere((s) => s.id == _sessionId);
+      if (index != -1) {
+        _sessions[index] = _sessions[index].copyWith(title: title);
+      } else {
+        _sessions.insert(0, ChatSession(id: _sessionId!, title: title));
+      }
     });
   }
 

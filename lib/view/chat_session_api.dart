@@ -14,6 +14,16 @@ class ChatSession {
       title: json['title']?.toString(),
     );
   }
+
+  ChatSession copyWith({
+    String? id,
+    String? title,
+  }) {
+    return ChatSession(
+      id: id ?? this.id,
+      title: title ?? this.title,
+    );
+  }
 }
 
 class ChatSessionApi {
