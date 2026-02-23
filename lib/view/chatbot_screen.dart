@@ -506,11 +506,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: AppColors.primaryColor,
-        title: const Text('Levely Chat', style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: AppColors.appBarIconColor),
+        title: const Text('Levely Chat', style: TextStyle(color: AppColors.appBarIconColor)),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: AppColors.appBarIconColor),
             tooltip: 'Refresh Sessions',
             onPressed: _fetchSessions,
           ),
@@ -634,8 +635,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ListTile(
-                leading: const Icon(Icons.add),
-                title: const Text('Chat Baru'),
+                leading: const Icon(Icons.add, color: AppColors.drawerItemColor),
+                title: const Text('Chat Baru', style: TextStyle(color: AppColors.drawerItemColor, fontWeight: FontWeight.bold)),
                 onTap: _createNewSession,
               ),
               const Divider(),
