@@ -38,6 +38,12 @@ jobs:
           path: /usr/local/lib/android/sdk/cmake/
           key: ${{ runner.os }}-cmake-3.22.1
 
+      - name: Cache Android SDK Platform 33
+        uses: actions/cache@v3
+        with:
+          path: /usr/local/lib/android/sdk/platforms/android-33
+          key: ${{ runner.os }}-android-sdk-33
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
