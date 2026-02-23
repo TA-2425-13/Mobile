@@ -698,7 +698,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                       final session = _sessions[index];
                       final isActive = session.id == _sessionId;
                       return ListTile(
-                        title: Text(session.title?.isNotEmpty == true ? session.title! : 'Sesi ${index + 1}'),
+                        title: Text(session.title?.isNotEmpty == true ? session.title! : 'Chat Baru'),
                         selected: isActive,
                         onTap: () {
                           Navigator.of(context).pop();
