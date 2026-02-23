@@ -27,6 +27,11 @@ jobs:
           ndk-version: r27d # Note: Using the exact version 27.0.12077973 from your logs
           add-to-path: false
 
+      - name: Fix CMake Permissions for Cache
+        run: |
+          sudo mkdir -p /usr/local/lib/android/sdk/cmake/
+          sudo chown -R $USER:$USER /usr/local/lib/android/sdk/cmake/
+
       - name: Cache CMake
         uses: actions/cache@v3
         with:
