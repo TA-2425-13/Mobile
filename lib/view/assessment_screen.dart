@@ -583,7 +583,6 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   onPressed: () {
                     setState(() {
                       _assessmentStarted = true;
-                      print("Starttt Anjinggggggg");
                       widget.updateAssessmentStarted(_assessmentStarted);
                       widget.updateMaterialLocked(true);
                     });
