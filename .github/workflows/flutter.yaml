@@ -66,6 +66,14 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
+      - name: Setup Keystore
+        run: |
+          echo "${{ secrets.PLAY_STORE_UPLOAD_KEY }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "storeFile=upload-keystore.jks" > android/key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_STORE_PASSWORD }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}" >> android/key.properties
+
       - name: Build AAB
         run: flutter build appbundle --release
 
