@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:app/model/chapter.dart';
 import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 
 import '../global_var.dart';
 import '../model/course.dart';
@@ -8,7 +9,7 @@ import '../model/course.dart';
 class CourseService {
   static Future<List<Course>> getEnrolledCourse(int id) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/user/$id/courses'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/user/$id/courses'));
       final body = response.body;
       final result = jsonDecode(body);
       List<Course> courses = List<Course>.from(
@@ -24,7 +25,7 @@ class CourseService {
 
   static Future<Course> getCourse(int id) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/course/$id'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/course/$id'));
       final body = response.body;
       final result = jsonDecode(body);
       Course courses = Course(
@@ -45,7 +46,7 @@ class CourseService {
 
   static Future<List<Chapter>> getChapterByCourse(int id) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/course/$id/chapters'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/course/$id/chapters'));
       final body = response.body;
       final result = jsonDecode(body);
       print(result);

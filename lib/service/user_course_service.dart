@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 
 import '../global_var.dart';
 import '../model/user_course.dart';
@@ -9,7 +10,7 @@ class UserCourseService {
   static Future<UserCourse> getUserCourse(int idUser, int idCourse) async {
     try {
       late UserCourse status;
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/usercourse/$idUser/$idCourse'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/usercourse/$idUser/$idCourse'));
       final body = response.body;
       final result = jsonDecode(body);
       print(result);

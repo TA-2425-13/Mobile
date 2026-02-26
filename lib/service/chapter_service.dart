@@ -2,6 +2,7 @@
 import 'package:app/global_var.dart';
 import 'package:app/model/assignment.dart';
 import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 import '../model/assessment.dart';
 import '../model/chapter.dart';
 import '../model/learning_material.dart';
@@ -10,7 +11,7 @@ class ChapterService {
 
   static Future<LearningMaterial> getMaterialByChapterId(int id) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/materials'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/materials'));
       final body = response.body;
       final result = jsonDecode(body);
       LearningMaterial chapter = LearningMaterial(
@@ -29,7 +30,7 @@ class ChapterService {
 
   static Future<Assessment> getAssessmentByChapterId(int id) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assessments'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assessments'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
@@ -67,7 +68,7 @@ class ChapterService {
 
   static Future<Assignment> getAssignmentByChapterId(int id) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assignments'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assignments'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
@@ -84,7 +85,7 @@ class ChapterService {
 
   static Future<Chapter> getChapterById(int id) async{
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
