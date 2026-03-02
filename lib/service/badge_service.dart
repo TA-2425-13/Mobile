@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:app/model/badge.dart';
 import 'package:app/model/user_badge.dart';
 import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 
 import '../global_var.dart';
 
@@ -10,7 +11,7 @@ class BadgeService {
 
   static Future<List<BadgeModel>> getBadgeListCourseByCourseId(int courseId) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/course/$courseId/badges'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/course/$courseId/badges'));
       final body = response.body;
       final result = jsonDecode(body);
       List<BadgeModel> list = List<BadgeModel>.from(
@@ -44,7 +45,7 @@ class BadgeService {
 
   static Future<List<UserBadge>> getUserBadgeListByUserId(int userId) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/user/$userId/badges'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/user/$userId/badges'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
@@ -63,7 +64,7 @@ class BadgeService {
 
   static Future<List<UserBadge>> getUserBadgeListWithStatusByUserId(int userId) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/user/$userId/badges'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/user/$userId/badges'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
@@ -78,7 +79,7 @@ class BadgeService {
 
   static Future<BadgeModel> getBadgeById(int badgeId) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/badge/$badgeId'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/badge/$badgeId'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {

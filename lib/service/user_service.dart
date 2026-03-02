@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:app/model/login.dart';
 import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 
 import '../global_var.dart';
 import '../model/user.dart';
@@ -8,7 +9,7 @@ import '../model/user.dart';
 class UserService {
   static Future<List<Student>> getAllUser() async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/user'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/user'));
       final body = response.body;
       final result = jsonDecode(body);
       List<Student> users = List<Student>.from(
@@ -24,7 +25,7 @@ class UserService {
 
   static Future<Student> getUserById(int id) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/user/$id'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/user/$id'));
       final body = response.body;
       final result = jsonDecode(body);
       Student users = Student.fromJson(result);

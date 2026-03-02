@@ -4,11 +4,12 @@ import 'package:app/global_var.dart';
 import 'package:app/model/trade.dart';
 import 'package:app/model/user_trade.dart';
 import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 
 class TradeService {
   static Future<List<TradeModel>> getAllTrades() async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/trade'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/trade'));
       final body = response.body;
       final result = jsonDecode(body);
       List<TradeModel> trades = List<TradeModel>.from(
@@ -44,7 +45,7 @@ class TradeService {
   static Future<List<UserTrade>> getUserTrade(int userId) async{
     try {
       List<UserTrade> filteredUserTrade = [];
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/usertrade'));
+      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/usertrade'));
       final body = response.body;
       final result = jsonDecode(body);
       List<UserTrade> trades = List<UserTrade>.from(
