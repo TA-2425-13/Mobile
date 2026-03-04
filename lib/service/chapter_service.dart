@@ -43,6 +43,7 @@ class ChapterService {
               ? jsonDecode(result['questions']) 
               : result['questions']);
       List<Question> questions = decodeQuestion.map((q) => Question(
+        id: q['id'],
         question: q['question'] ?? 'No question text',
         option: q['options'] != null ? List<String>.from(q['options']) : [],
         correctedAnswer: q['correctedAnswer'] ?? q['answer'] ?? '',

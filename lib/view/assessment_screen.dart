@@ -217,12 +217,12 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       return;
     }
 
-    final answersPayload = question!.questions.asMap().entries.map((entry) {
-      final selected = entry.value.selectedAnswer.isNotEmpty
-          ? entry.value.selectedAnswer
-          : entry.value.selectedMultAnswer.join(', ');
+    final answersPayload = question!.questions.map((q) {
+      final selected = q.selectedAnswer.isNotEmpty
+          ? q.selectedAnswer
+          : q.selectedMultAnswer.join(', ');
       return {
-        'index': entry.key,
+        'questionId': q.id,
         'answer': selected,
       };
     }).toList();

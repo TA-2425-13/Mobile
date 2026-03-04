@@ -32,6 +32,7 @@ class Assessment {
 }
 
 class Question {
+  int? id;
   String question;
   List<String> option;
   String correctedAnswer;
@@ -43,6 +44,7 @@ class Question {
   bool isCorrect = false;
 
   Question({
+    this.id,
     required this.question,
     required this.option,
     required this.correctedAnswer,
