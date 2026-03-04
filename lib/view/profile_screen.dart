@@ -262,11 +262,27 @@ class _ProfileState extends State<ProfileScreen> {
                                   fontFamily: 'DIN_Next_Rounded',
                                   color: Colors.white
                               )),
-                          Text(user!.studentId!,
+                          Text(user!.studentId ?? '',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   fontFamily: 'DIN_Next_Rounded',
                                   color: GlobalVar.accentColor
                               )),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.amber,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              user!.eloTitle ?? 'Beginner',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontFamily: 'DIN_Next_Rounded',
+                                color: Colors.black87,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 16),
                           // const Divider(),
                           Container(

@@ -354,9 +354,18 @@ class _HomeState extends State<Homescreen> {
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'DIN_Next_Rounded',
                           ),
                         ),
-                        subtitle: Text(
-                          list[index].studentId!,
-                          style: TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              list[index].studentId ?? '',
+                              style: TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
+                            ),
+                            Text(
+                              list[index].eloTitle ?? 'Beginner',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54, fontFamily: 'DIN_Next_Rounded'),
+                            ),
+                          ],
                         ),
                         trailing: Text(
                           '${list[index].points} Poin',
@@ -520,6 +529,22 @@ class _HomeState extends State<Homescreen> {
                       fontWeight: FontWeight.bold,
                       fontFamily: 'DIN_Next_Rounded'
                   )),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.amber,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  user?.eloTitle ?? 'Beginner',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'DIN_Next_Rounded',
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ],
           ),
           GestureDetector(

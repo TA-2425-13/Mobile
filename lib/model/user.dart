@@ -6,6 +6,7 @@ class Student {
   final String role;
   String? studentId;
   int? points;
+  String? eloTitle;
   int? totalCourses;
   int? badges;
   String? instructorId;
@@ -23,6 +24,7 @@ class Student {
     required this.role,
     this.studentId,
     this.points,
+    this.eloTitle,
     this.totalCourses,
     this.badges,
     this.instructorId,
@@ -41,6 +43,7 @@ class Student {
       role: json['role'],
       studentId: json['studentId'],
       points: json['points'],
+      eloTitle: json['eloTitle'],
       totalCourses: json['totalCourses'],
       badges: json['badges'],
       instructorId: json['instructorId'],

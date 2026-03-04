@@ -199,9 +199,18 @@ class _FriendsScreen extends State<FriendsScreen> {
               user.name,
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
             ),
-            subtitle: Text(
-              user.studentId!,
-              style: TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.studentId ?? '',
+                  style: TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
+                ),
+                Text(
+                  user.eloTitle ?? 'Beginner',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54, fontFamily: 'DIN_Next_Rounded'),
+                ),
+              ],
             ),
             trailing: Text(
               '${user.points} Poin',

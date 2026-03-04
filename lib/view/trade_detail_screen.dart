@@ -201,11 +201,31 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Pointku : ${user?.points != null ? user!.points : 0}", style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'DIN_Next_Rounded',
-                ),),
+                Row(
+                  children: [
+                    Text("Pointku : ${user?.points ?? 0} ", style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'DIN_Next_Rounded',
+                    ),),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        user?.eloTitle ?? 'Beginner',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                          fontFamily: 'DIN_Next_Rounded'
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 SizedBox(height: 12,),
                 ClipRRect(
                     borderRadius: BorderRadius.circular(16),
