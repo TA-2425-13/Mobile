@@ -1,4 +1,4 @@
-  import 'dart:convert';
+import 'dart:convert';
 import 'package:app/global_var.dart';
 import 'package:app/model/assignment.dart';
 import 'package:http/http.dart' as http;
@@ -37,12 +37,16 @@ class ChapterService {
         throw Exception("No assessments found");
       }
 
-      final List<dynamic> decodeQuestion = jsonDecode(result['questions']);
+      final List<dynamic> decodeQuestion = result['questions'] == null 
+          ? [] 
+          : (result['questions'] is String 
+              ? jsonDecode(result['questions']) 
+              : result['questions']);
       List<Question> questions = decodeQuestion.map((q) => Question(
-        question: q['question'],
-        option: List<String>.from(q['options']),
-        correctedAnswer: q['answer'],
-        type: q['type'],
+        question: q['question'] ?? 'No question text',
+        option: q['options'] != null ? List<String>.from(q['options']) : [],
+        correctedAnswer: q['correctedAnswer'] ?? q['answer'] ?? '',
+        type: q['type'] ?? 'PG',
         elo: q['elo'] ?? 1200,
       )).toList();
 
