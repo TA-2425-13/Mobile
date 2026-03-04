@@ -226,7 +226,7 @@ class _CourseDetail extends State<MycourseScreen> {
         margin: EdgeInsets.all(10),
         child:  Column(
           children: [
-            course.image != null && course.image != '' ?
+            course.image != '' ?
             Image.network(course.image, height: 100, width: double.infinity, fit: BoxFit.cover)
                 : Image.network(url, height: 100, width: double.infinity, fit: BoxFit.cover),
             ListTile(

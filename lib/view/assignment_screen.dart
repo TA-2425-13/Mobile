@@ -446,7 +446,7 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                         Text("Feedback", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded')),
                         Text("Score : ${status.assignmentScore}", style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
                         Text(
-                          "${status.assignmentFeedback}",
+                          status.assignmentFeedback,
                           style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                         ),
                       ],

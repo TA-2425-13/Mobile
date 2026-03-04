@@ -122,21 +122,21 @@ class _CourseDetail extends State<CourseDetailScreen> {
       case 1 : {
         for(BadgeModel i in listBadge!) {
           if(i.type == 'BEGINNER') {
-            idbadge = i.id as int;
+            idbadge = i.id;
           }
         }
       }
       case 2 : {
         for(BadgeModel i in listBadge!) {
           if(i.type == 'INTERMEDIATE') {
-            idbadge = i.id as int;
+            idbadge = i.id;
           }
         }
       }
       case 3 : {
         for(BadgeModel i in listBadge!) {
           if(i.type == 'ADVANCE') {
-            idbadge = i.id as int;
+            idbadge = i.id;
           }
         }
       }

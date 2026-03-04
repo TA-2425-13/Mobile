@@ -88,7 +88,7 @@ class _CongratulationsScreenState extends State<CongratulationsScreen> {
                   if (widget.onContinue != null)
                     ElevatedButton(
                       onPressed: widget.onContinue,
-                      style: ButtonStyle(backgroundColor: MaterialStateProperty.all<Color>(AppColors.primaryColor)),
+                      style: ButtonStyle(backgroundColor: WidgetStateProperty.all<Color>(AppColors.primaryColor)),
                       child: Text("Ayo Lanjutkan ke Level Berikutnya", style: TextStyle(fontSize: 16, color: Colors.white, fontFamily: 'DIN_Next_Rounded')),
                     ),
                 ],

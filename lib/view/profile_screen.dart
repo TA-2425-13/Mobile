@@ -287,7 +287,7 @@ class _ProfileState extends State<ProfileScreen> {
                                 _buildInfoColumn(LineAwesomeIcons.trophy_solid,
                                     'Peringkat', '$rank / ${list.length}', GlobalVar.secondaryColor),
                                 _buildInfoColumn(LineAwesomeIcons.gem_solid,
-                                    'Poin', '${user?.points != null ? user?.points : 0}', GlobalVar.secondaryColor)
+                                    'Poin', '${user?.points ?? 0}', GlobalVar.secondaryColor)
                               ],
                             ),
                           ),
@@ -330,7 +330,7 @@ class _ProfileState extends State<ProfileScreen> {
                           SizedBox(
                             height: 8,
                           ),
-                          Container(
+                          SizedBox(
                             height: 64,
                             child: userBadges!.isNotEmpty ? ListView.builder(
                               scrollDirection: Axis.horizontal,

@@ -42,7 +42,8 @@ class ChapterService {
         question: q['question'],
         option: List<String>.from(q['options']),
         correctedAnswer: q['answer'],
-        type: q['type']
+        type: q['type'],
+        elo: q['elo'] ?? 1200,
       )).toList();
 
       // Decode answers safely (null-safe handling)

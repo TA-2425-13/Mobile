@@ -12,6 +12,7 @@ class ChapterStatus {
   bool assignmentDone;
   List<String> assessmentAnswer;
   int assessmentGrade;
+  int assessmentEloDelta;
   String? submission;
   DateTime timeStarted;
   DateTime timeFinished;
@@ -31,6 +32,7 @@ class ChapterStatus {
     required this.assignmentDone,
     required this.assessmentAnswer,
     required this.assessmentGrade,
+    required this.assessmentEloDelta,
     this.submission,
     required this.timeStarted,
     required this.timeFinished,
@@ -56,6 +58,7 @@ class ChapterStatus {
         assignmentDone: json['assignmentDone'],
         assessmentAnswer: resultListAnswer,
         assessmentGrade: json['assessmentGrade'],
+        assessmentEloDelta: json['assessmentEloDelta'] ?? 0,
         submission: json['submission'],
         timeStarted: DateTime.parse(json['timeStarted']),
         timeFinished: DateTime.parse(json['timeFinished']),
@@ -76,6 +79,7 @@ class ChapterStatus {
         assignmentDone: json['assignmentDone'],
         assessmentAnswer: json['assessmentAnswer'],
         assessmentGrade: json['assessmentGrade'],
+        assessmentEloDelta: json['assessmentEloDelta'] ?? 0,
         submission: json['submission'],
         timeStarted: DateTime.parse(json['timeStarted']),
         timeFinished: DateTime.parse(json['timeFinished']),
@@ -99,6 +103,7 @@ class ChapterStatus {
       'assignmentDone': assignmentDone,
       'assessmentAnswer': assessmentAnswer,
       'assessmentGrade': assessmentGrade,
+      'assessmentEloDelta': assessmentEloDelta,
       'submission': submission,
       'timeStarted': timeStarted.toUtc().toIso8601String(),
       'timeFinished': timeFinished.toUtc().toIso8601String(),

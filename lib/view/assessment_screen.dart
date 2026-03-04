@@ -356,10 +356,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     status = await UserChapterService.updateChapterStatus(status.id, status);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-
+  Widget _buildBody(BuildContext context, bool isLandscape) {
     if (!_assessmentStarted && !widget.status.assessmentDone) {
       return _buildAssessmentInitial(isLandscape: isLandscape);
     } else if (!_assessmentFinished && !widget.status.assessmentDone ) {
@@ -545,6 +542,51 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: _buildBody(context, isLandscape),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.redAccent,
+        onPressed: () async {
+          status.assessmentDone = false;
+          status.assessmentAnswer = [];
+          status.assessmentGrade = 0;
+          
+          setState(() {
+             _assessmentStarted = false;
+             _assessmentFinished = false;
+             assessmentDone = false;
+             tapped = false;
+             allQuestionsAnswered = false;
+             correctAnswer = 0;
+             _grade = 0;
+             _currentPage = 0;
+             if (question != null) {
+               for (var q in question!.questions) {
+                 q.selectedAnswer = '';
+                 q.selectedMultiAnswer = [];
+                 q.isCorrect = false;
+                 q.score = 0;
+               }
+             }
+          });
+          
+          await UserChapterService.updateChapterStatus(status.id, status);
+          widget.updateStatus(status);
+          widget.updateAssessmentFinished(false);
+          widget.updateAssessmentStarted(false);
+          widget.updateMaterialLocked(false);
+        },
+        icon: const Icon(Icons.refresh, color: Colors.white),
+        label: const Text('Reset (Test)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded')),
+      ),
+    );
+  }
+
   Widget _buildAssessmentInitial({bool isLandscape = false}) {
     return Container(
       decoration: BoxDecoration(
@@ -646,10 +688,32 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             child: ListTile(
               leading: Text('${number + 1}', style: TextStyle(fontSize: 20, fontFamily: 'DIN_Next_Rounded', color: AppColors.primaryColor)),
               isThreeLine: true,
-              title: Column(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  allQuestionsAnswered && tapped ? Text("Skor : ${question?.questions[number].score} / ${(100 / (question!.questions.length)).ceil()}", style: TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)) : SizedBox(),
-                  Text(question?.questions[number].question ?? 'No question available', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        allQuestionsAnswered && tapped ? Text("Skor : ${question?.questions[number].score} / ${(100 / (question!.questions.where((q) => q.type != 'EY').isNotEmpty ? question!.questions.where((q) => q.type != 'EY').length : 1)).ceil()}", style: TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)) : SizedBox(),
+                        Text(question?.questions[number].question ?? 'No question available', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.amber.shade400)
+                    ),
+                    child: Text(
+                      '${question?.questions[number].elo} ELO', 
+                      style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', fontSize: 12)
+                    ),
+                  ),
                 ],
               ),
               subtitle: question?.questions[number].option.isNotEmpty ?? false
@@ -666,10 +730,32 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             child: ListTile(
               leading: Text('${number + 1}', style: TextStyle(fontSize: 20, fontFamily: 'DIN_Next_Rounded', color: AppColors.primaryColor)),
               isThreeLine: true,
-              title: Column(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  allQuestionsAnswered && tapped ? Text("Skor : ${question?.questions[number].score} / ${(100 / (question!.questions.length)).ceil()}", style: TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)) : SizedBox(),
-                  Text(question?.questions[number].question ?? 'No question available', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        allQuestionsAnswered && tapped ? Text("Skor : Menunggu Review", style: TextStyle(color: Colors.orange, fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)) : SizedBox(),
+                        Text(question?.questions[number].question ?? 'No question available', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.amber.shade400)
+                    ),
+                    child: Text(
+                      '${question?.questions[number].elo} ELO', 
+                      style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', fontSize: 12)
+                    ),
+                  ),
                 ],
               ),
               subtitle: _buildTextAnswer(question!.questions[number]),
@@ -692,9 +778,30 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            question?.questions[number].question ?? 'Belum ada pertanyaan',
-            style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  question?.questions[number].question ?? 'Belum ada pertanyaan',
+                  style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                ),
+              ),
+              SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.amber.shade400)
+                ),
+                child: Text(
+                  '${question?.questions[number].elo} ELO', 
+                  style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', fontSize: 12)
+                ),
+              ),
+            ],
           ),
           SizedBox(height: 16),
           if (question?.questions[number].type == 'TF')
@@ -715,13 +822,13 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           setState(() {
             q.selectedAnswer = 'True';
           });
-        }, child: Text("True"), style: ElevatedButton.styleFrom(backgroundColor: q.selectedAnswer == "True" ? Colors.blue : Colors.grey),),
+        }, style: ElevatedButton.styleFrom(backgroundColor: q.selectedAnswer == "True" ? Colors.blue : Colors.grey), child: Text("True"),),
         SizedBox(width: 10,),
         ElevatedButton(onPressed: (){
           setState(() {
             q.selectedAnswer = 'False';
           });
-        }, child: Text("False"), style: ElevatedButton.styleFrom(backgroundColor: q.selectedAnswer == "False" ? Colors.blue : Colors.grey),)
+        }, style: ElevatedButton.styleFrom(backgroundColor: q.selectedAnswer == "False" ? Colors.blue : Colors.grey), child: Text("False"),)
       ],
     );
   }
@@ -908,7 +1015,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.all(0),
-                                    child: Text(': $correctAnswer / ${question!.questions.length}', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white),),
+                                    child: Text(': $correctAnswer / ${question!.questions.where((q) => q.type != 'EY').length}', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white),),
                                   ),
                                 ],
                               ),

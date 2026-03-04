@@ -38,7 +38,7 @@ class LevelyApp extends StatelessWidget {
 }
 
 class _BootstrapScreen extends StatefulWidget {
-  const _BootstrapScreen({super.key});
+  const _BootstrapScreen();
 
   @override
   State<_BootstrapScreen> createState() => _BootstrapScreenState();

@@ -70,6 +70,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
   void updateProgress(bool value) {
     setState(() {
       materialComplete = true;// Update progress in real-time
+      _screens[1] = null;
     });
     print("Material complete : $materialComplete");
   }
@@ -77,12 +78,15 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
   void updateStatus(ChapterStatus value) {
     setState(() {
       status = value; // Update progress in real-time
+      _screens[1] = null;
+      _screens[2] = null;
     });
   }
 
   void updateMaterialLocked(bool value) {
     setState(() {
       _materialLocked = value; // Update progress in real-time
+      _screens[0] = null;
     });
   }
 
@@ -95,6 +99,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
   void updateAssessmentFinished(bool value) {
     setState(() {
       _assessmentFinished = value; // Update progress in real-time
+      _screens[2] = null;
     });
   }
 
@@ -110,7 +115,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
           print('$materialComplete awoooooo');
           _screens[index] = materialComplete
               ? widget.status.assessmentDone
-              ? AlreadyFinishedAssessmentAssessmentScreen(status: widget.status, user: widget.user)
+              ? AlreadyFinishedAssessmentAssessmentScreen(status: widget.status, user: widget.user, updateStatus: updateStatus)
               : AssessmentScreen(
                   status: widget.status,
                   user: widget.user,

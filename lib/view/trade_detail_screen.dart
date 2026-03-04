@@ -8,7 +8,6 @@ import 'package:app/view/whatadeal_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lottie/lottie.dart';
 
 import '../model/user.dart';
 import '../service/user_service.dart';
@@ -241,7 +240,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   ),
                 ),
                 Text(
-                  'Tukarkan satu buah badge dengan tipe ${widget.trade.requiredBadgeType} dan tukarkan point sebanyak ${reqPoint} untuk mendapatkan penawaran ini!',
+                  'Tukarkan satu buah badge dengan tipe ${widget.trade.requiredBadgeType} dan tukarkan point sebanyak $reqPoint untuk mendapatkan penawaran ini!',
                   style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                 ),
                 SizedBox(height: 16),

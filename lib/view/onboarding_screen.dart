@@ -122,7 +122,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class OnboardingPage extends StatelessWidget {
   final OnboardingModel model;
 
-  OnboardingPage({required this.model});
+  const OnboardingPage({super.key, required this.model});
 
   @override
   Widget build(BuildContext context) {

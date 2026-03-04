@@ -36,6 +36,7 @@ class Question {
   List<String> option;
   String correctedAnswer;
   String type;
+  int elo;
   String _selectedAnswer = '';
   int score = 0;
   List<String> _selectedMultiAnswer = [];
@@ -45,7 +46,8 @@ class Question {
     required this.question,
     required this.option,
     required this.correctedAnswer,
-    required this.type
+    required this.type,
+    this.elo = 1200,
   });
 
   String get selectedAnswer => _selectedAnswer;

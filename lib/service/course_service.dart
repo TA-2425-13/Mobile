@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:app/model/chapter.dart';
-import 'package:http/http.dart' as http;
 import 'api_cache_service.dart';
 
 import '../global_var.dart';

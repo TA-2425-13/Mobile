@@ -20,11 +20,11 @@ import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../model/assessment.dart';
-import '../model/user.dart';
-import '../service/user_course_service.dart';
-import 'congratulation_screen.dart';
-import 'custom_tab_indicator.dart';
+import 'package:app/model/assessment.dart';
+import 'package:app/model/user.dart';
+import 'package:app/service/user_course_service.dart';
+import 'package:app/view/congratulation_screen.dart';
+import 'package:app/view/custom_tab_indicator.dart';
 
 class Chapterscreen extends StatefulWidget {
   final ChapterStatus status;
