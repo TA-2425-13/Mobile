@@ -103,6 +103,73 @@ class ChapterService {
     }
   }
 
+  static Future<AssessmentAttempt> prefetchAssessmentAttempt(int chapterId, int userId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/prefetch'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': userId,
+          'chapterId': chapterId,
+        }),
+      );
+
+      final dynamic result = jsonDecode(response.body);
+      if (response.statusCode != 200) {
+        final message = result is Map<String, dynamic>
+            ? (result['message'] ?? 'Gagal prefetch assessment').toString()
+            : 'Gagal prefetch assessment';
+        throw Exception(message);
+      }
+
+      if (result is! Map<String, dynamic>) {
+        throw Exception('Payload prefetch attempt tidak valid');
+      }
+
+      return AssessmentAttempt.fromJson(result);
+    } catch (e) {
+      throw Exception("Error prefetching assessment attempt: ${e.toString()}");
+    }
+  }
+
+  static Future<Map<String, dynamic>> answerAssessmentQuestion({
+    required int chapterId,
+    required int userId,
+    required int attemptId,
+    required int questionId,
+    required String answer,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/answer'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': userId,
+          'chapterId': chapterId,
+          'attemptId': attemptId,
+          'questionId': questionId,
+          'answer': answer,
+        }),
+      );
+
+      final dynamic result = jsonDecode(response.body);
+      if (response.statusCode != 200) {
+        final message = result is Map<String, dynamic>
+            ? (result['message'] ?? 'Gagal submit jawaban soal').toString()
+            : 'Gagal submit jawaban soal';
+        throw Exception(message);
+      }
+
+      if (result is! Map<String, dynamic>) {
+        throw Exception('Payload jawaban soal tidak valid');
+      }
+
+      return result;
+    } catch (e) {
+      throw Exception("Error answering assessment question: ${e.toString()}");
+    }
+  }
+
   static Future<AssessmentAttempt?> getCurrentAssessmentAttempt(int chapterId, int userId) async {
     try {
       final response = await http.get(

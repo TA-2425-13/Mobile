@@ -8,6 +8,7 @@ import 'package:app/view/material_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../model/user.dart';
+import '../service/chapter_service.dart';
 import 'custom_tab_indicator.dart';
 
 class Chapterscreen extends StatefulWidget {
@@ -45,6 +46,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
   bool _materialLocked = false;
   bool _assessmentStarted = false;
   bool _assessmentFinished = false;
+  bool _prefetchTriggered = false;
   
 
   @override
@@ -59,6 +61,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
         _currentIndex = _tabController.index;
       });
     });
+    _prefetchAttemptInBackground();
   }
 
   @override
@@ -72,7 +75,34 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
       materialComplete = true;// Update progress in real-time
       _screens[1] = null;
     });
-    print("Material complete : $materialComplete");
+  }
+
+  Future<void> _prefetchAttemptInBackground() async {
+    if (_prefetchTriggered) {
+      return;
+    }
+    if (widget.status.assessmentDone) {
+      return;
+    }
+
+    try {
+      final latestAttempt = await ChapterService.getLatestAssessmentAttempt(
+        widget.status.chapterId,
+        widget.user.id,
+      );
+      if (latestAttempt != null) {
+        return;
+      }
+
+      await ChapterService.prefetchAssessmentAttempt(
+        widget.status.chapterId,
+        widget.user.id,
+      );
+      _prefetchTriggered = true;
+    } catch (error) {
+      // Silent fail. User can still start and backend will generate on start.
+      debugPrint('Prefetch attempt failed: $error');
+    }
   }
 
   void updateStatus(ChapterStatus value) {
@@ -112,7 +142,6 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
               : MaterialScreen(status: widget.status, chapterName: widget.chapterName, updateProgress: updateProgress, updateStatus: updateStatus,);
           break;
         case 1:
-          print('$materialComplete awoooooo');
           _screens[index] = materialComplete
               ? widget.status.assessmentDone
               ? AlreadyFinishedAssessmentAssessmentScreen(status: widget.status, user: widget.user, updateStatus: updateStatus)
