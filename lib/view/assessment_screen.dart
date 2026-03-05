@@ -6,6 +6,7 @@ import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 
 import 'package:app/global_var.dart';
 import 'package:app/model/assessment.dart';
+import 'package:app/model/assessment_attempt.dart';
 import 'package:app/model/chapter_status.dart';
 import 'package:app/model/user.dart';
 import 'package:app/service/chapter_service.dart';
@@ -51,6 +52,10 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   String? _aiFeedback;
   String? _newDifficultyLabel;
   bool _isSubmitting = false;
+  bool _isLoadingAttempt = false;
+  bool _isStartingAttempt = false;
+  bool _forceNewOnNextStart = false;
+  int? _attemptId;
   Student? user;
   late ChapterStatus status;
   Assessment? question;
@@ -59,50 +64,115 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
   @override
   void initState() {
-    getAssessment(widget.status.chapterId);
-    allQuestionsAnswered = widget.status.assessmentDone;
-    assessmentDone = widget.status.assessmentDone;
     status = widget.status;
     user = widget.user;
-    _assessmentFinished = assessmentDone;
-    tapped = assessmentDone;
     _grade = status.assessmentGrade;
+    _pointsEarned = status.assessmentEloDelta;
+    allQuestionsAnswered = false;
+    assessmentDone = false;
+    _assessmentFinished = false;
+    tapped = false;
     super.initState();
+    _bootstrapCurrentAttempt();
   }
 
-  void getAssessment(int id) async {
-    final resultAssessment = await ChapterService.getAssessmentByChapterId(id);
-    setState(() {
-      question = resultAssessment;
-    });
-    if (assessmentDone) {
-      _prefillCompletedAnswers();
-    }
-  }
-
-  void _prefillCompletedAnswers() {
-    if (question == null || status.assessmentAnswer.isEmpty) {
+  Future<void> _bootstrapCurrentAttempt() async {
+    if (user == null) {
       return;
     }
 
-    int tempCorrect = 0;
-    for (int index = 0; index < question!.questions.length; index++) {
-      if (index >= status.assessmentAnswer.length) {
-        break;
+    setState(() {
+      _isLoadingAttempt = true;
+    });
+
+    try {
+      final currentAttempt = await ChapterService.getCurrentAssessmentAttempt(
+        status.chapterId,
+        user!.id,
+      );
+      if (!mounted || currentAttempt == null) {
+        return;
       }
-      final answer = status.assessmentAnswer[index];
-      question!.questions[index].selectedAnswer = answer;
-      final isCorrect = answer.trim().toLowerCase() ==
-          question!.questions[index].correctedAnswer.trim().toLowerCase();
-      question!.questions[index].isCorrect = isCorrect;
-      if (isCorrect) {
-        tempCorrect++;
+
+      _applyAttempt(currentAttempt, lockMaterial: true);
+    } catch (error) {
+      // Keep initial state when no active attempt available.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingAttempt = false;
+        });
       }
+    }
+  }
+
+  void _applyAttempt(AssessmentAttempt attempt, {required bool lockMaterial}) {
+    final assessment = attempt.toAssessment();
+
+    setState(() {
+      question = assessment;
+      _attemptId = attempt.attemptId;
+      _assessmentStarted = true;
+      _assessmentFinished = false;
+      _currentPage = 0;
+      tapped = false;
+      assessmentDone = false;
+      allQuestionsAnswered = false;
+      correctAnswer = 0;
+    });
+
+    widget.updateAssessmentStarted(true);
+    widget.updateAssessmentFinished(false);
+    widget.updateMaterialLocked(lockMaterial);
+  }
+
+  Future<void> _startAssessmentAttempt() async {
+    if (_isStartingAttempt || user == null) {
+      return;
     }
 
     setState(() {
-      correctAnswer = tempCorrect;
+      _isStartingAttempt = true;
     });
+
+    bool loaderVisible = false;
+    if (mounted) {
+      loaderVisible = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      ).then((_) {
+        loaderVisible = false;
+      });
+    }
+
+    try {
+      final startedAttempt = await ChapterService.startAssessmentAttempt(
+        status.chapterId,
+        user!.id,
+        forceNew: _forceNewOnNextStart,
+      );
+      if (!mounted) {
+        return;
+      }
+      _forceNewOnNextStart = false;
+      _applyAttempt(startedAttempt, lockMaterial: true);
+      if (startedAttempt.source == 'FALLBACK_BANK') {
+        _showInfo('LLM belum berhasil generate soal, sistem memakai bank soal cadangan.');
+      }
+    } catch (error) {
+      _showSubmissionError(error.toString());
+    } finally {
+      if (loaderVisible && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      if (mounted) {
+        setState(() {
+          _isStartingAttempt = false;
+        });
+      }
+    }
   }
 
   void _showFinishConfirmation() {
@@ -230,6 +300,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     final payload = {
       'userId': user!.id,
       'chapterId': status.chapterId,
+      if (_attemptId != null) 'attemptId': _attemptId,
       'answers': answersPayload,
     };
 
@@ -294,10 +365,12 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       assessmentDone = true;
       status.assessmentDone = true;
       status.assessmentGrade = _grade;
+      status.assessmentEloDelta = _pointsEarned;
       status.assessmentAnswer = answers;
       allQuestionsAnswered = true;
       tapped = true;
       _assessmentFinished = true;
+      _attemptId = null;
       user?.points = (user?.points ?? 0) + _pointsEarned;
     });
 
@@ -352,11 +425,24 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     );
   }
 
+  void _showInfo(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message, style: const TextStyle(fontFamily: 'DIN_Next_Rounded'))),
+    );
+  }
+
   Future<void> updateStatus() async {
     status = await UserChapterService.updateChapterStatus(status.id, status);
   }
 
   Widget _buildBody(BuildContext context, bool isLandscape) {
+    if (_isLoadingAttempt && !_assessmentStarted) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (!_assessmentStarted && !widget.status.assessmentDone) {
       return _buildAssessmentInitial(isLandscape: isLandscape);
     } else if (!_assessmentFinished && !widget.status.assessmentDone ) {
@@ -555,6 +641,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           status.assessmentDone = false;
           status.assessmentAnswer = [];
           status.assessmentGrade = 0;
+          status.assessmentEloDelta = 0;
           
           setState(() {
              _assessmentStarted = false;
@@ -564,16 +651,12 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
              allQuestionsAnswered = false;
              correctAnswer = 0;
              _grade = 0;
+             _pointsEarned = 0;
              _currentPage = 0;
-             if (question != null) {
-               for (var q in question!.questions) {
-                 q.selectedAnswer = '';
-                 q.selectedMultiAnswer = [];
-                 q.isCorrect = false;
-                 q.score = 0;
-               }
-             }
-          });
+             _forceNewOnNextStart = true;
+             _attemptId = null;
+             question = null;
+           });
           
           await UserChapterService.updateChapterStatus(status.id, status);
           widget.updateStatus(status);
@@ -622,13 +705,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryColor,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _assessmentStarted = true;
-                      widget.updateAssessmentStarted(_assessmentStarted);
-                      widget.updateMaterialLocked(true);
-                    });
-                  },
+                  onPressed: _isStartingAttempt ? null : _startAssessmentAttempt,
                   icon: Icon(LineAwesomeIcons.paper_plane, color: Colors.white,),
                   label: Text('Mulai', style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
                 ),
@@ -657,13 +734,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryColor,
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _assessmentStarted = true;
-                        widget.updateAssessmentStarted(_assessmentStarted);
-                        widget.updateMaterialLocked(true);
-                      });
-                    },
+                    onPressed: _isStartingAttempt ? null : _startAssessmentAttempt,
                     icon: Icon(LineAwesomeIcons.paper_plane, color: Colors.white,),
                     label: Text('Mulai', style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
                   ),
@@ -913,7 +984,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   }
 
   Widget _buildTextAnswer(Question question) {
-    TextEditingController controller = TextEditingController(text: question.selectedAnswer ?? '');
+    TextEditingController controller = TextEditingController(text: question.selectedAnswer);
     controller.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
 
     return Card(
