@@ -100,9 +100,13 @@ flutter:
     - lib/assets/pictures/node.png
     - lib/assets/pictures/react.png
     - lib/assets/pictures/supabase.png
-    - lib/assets/badges/imk-2.png
-    - lib/assets/badges/imk-1.png
-    - lib/assets/badges/imk-3.png
+    - lib/assets/badges/beginner.png
+    - lib/assets/badges/basic_understanding.png
+    - lib/assets/badges/developing_learner.png
+    - lib/assets/badges/intermediate.png
+    - lib/assets/badges/proficient.png
+    - lib/assets/badges/advanced.png
+    - lib/assets/badges/master.png
     - lib/assets/pixels/assessment-pixel.png
     - lib/assets/pixels/assignment-pixel.png
     - lib/assets/pixels/check.png
