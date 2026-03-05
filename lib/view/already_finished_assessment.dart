@@ -45,6 +45,19 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
   }
 
   void getAssessment(int id) async {
+    try {
+      final latestAttempt = await ChapterService.getLatestAssessmentAttempt(id, widget.user.id);
+      if (latestAttempt != null) {
+        setState(() {
+          question = latestAttempt.toAssessment();
+          _resultFuture = _calculateResults();
+        });
+        return;
+      }
+    } catch (_error) {
+      // fallback to legacy endpoint below
+    }
+
     final resultAssessment = await ChapterService.getAssessmentByChapterId(id);
     setState(() {
       question = resultAssessment;
@@ -158,30 +171,37 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
     final nonEssayQuestions = questions.where((q) => q.type != 'EY').toList();
     final totalAssessable = nonEssayQuestions.isEmpty ? 1 : nonEssayQuestions.length;
     double rangeScore = 100 / totalAssessable;
-    final answerCount = status.assessmentAnswer.length;
-    final total = answerCount < questions.length ? answerCount : questions.length;
 
-    for (int i = 0; i < total; i++) {
+    final hasPreloadedAnswers = questions.any((q) => q.selectedAnswer.trim().isNotEmpty);
+    if (!hasPreloadedAnswers && status.assessmentAnswer.isNotEmpty) {
+      final total = status.assessmentAnswer.length < questions.length
+          ? status.assessmentAnswer.length
+          : questions.length;
+      for (int i = 0; i < total; i++) {
         questions[i].selectedAnswer = status.assessmentAnswer[i];
+      }
+    }
 
-        if (questions[i].type != 'EY') {
-            questions[i].isCorrect =
-                questions[i].selectedAnswer == questions[i].correctedAnswer || 
-                (questions[i].correctedAnswer.trim().isEmpty && questions[i].isCorrect); 
-                // in case standard correctedAnswer wasn't fetched right but logic says it's correct
-            if (questions[i].selectedAnswer.trim().toLowerCase() == questions[i].correctedAnswer.trim().toLowerCase() && questions[i].correctedAnswer.isNotEmpty) {
-               questions[i].isCorrect = true;
-            }
+    for (int i = 0; i < questions.length; i++) {
+      final current = questions[i];
+      if (current.type == 'EY') {
+        current.isCorrect = false;
+        current.score = current.score;
+        continue;
+      }
 
-            if (questions[i].isCorrect == true) {
-                questions[i].score = rangeScore.ceil();
-                correctAnswer++;
-                print(correctAnswer);
-            }
-        } else {
-            // Essay logic completely bypassed for local scoring and correctness
-            questions[i].isCorrect = false;
+      final normalizedSelected = current.selectedAnswer.trim().toLowerCase();
+      final normalizedCorrect = current.correctedAnswer.trim().toLowerCase();
+      final isCorrect = current.isCorrect ||
+          (normalizedSelected.isNotEmpty && normalizedSelected == normalizedCorrect);
+
+      current.isCorrect = isCorrect;
+      if (isCorrect) {
+        if (current.score <= 0) {
+          current.score = rangeScore.ceil();
         }
+        correctAnswer++;
+      }
     }
 
     point = status.assessmentGrade;
@@ -480,7 +500,7 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
   }
 
   Widget _buildTextAnswer(Question question) {
-    TextEditingController controller = TextEditingController(text: question.selectedAnswer ?? '');
+    TextEditingController controller = TextEditingController(text: question.selectedAnswer);
     controller.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
 
     return Card(

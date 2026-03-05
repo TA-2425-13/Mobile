@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:app/global_var.dart';
 import 'package:app/model/assignment.dart';
+import 'package:app/model/assessment_attempt.dart';
 import 'package:http/http.dart' as http;
 import 'api_cache_service.dart';
 import '../model/assessment.dart';
@@ -69,6 +70,100 @@ class ChapterService {
       return assessment;
     } catch (e) {
       throw Exception("Error fetching assessment: ${e.toString()}");
+    }
+  }
+
+  static Future<AssessmentAttempt> startAssessmentAttempt(int chapterId, int userId, {bool forceNew = false}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/start'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': userId,
+          'chapterId': chapterId,
+          'forceNew': forceNew,
+        }),
+      );
+
+      final dynamic result = jsonDecode(response.body);
+      if (response.statusCode != 200) {
+        final message = result is Map<String, dynamic>
+            ? (result['message'] ?? 'Gagal memulai assessment').toString()
+            : 'Gagal memulai assessment';
+        throw Exception(message);
+      }
+
+      if (result is! Map<String, dynamic>) {
+        throw Exception('Payload attempt tidak valid');
+      }
+
+      return AssessmentAttempt.fromJson(result);
+    } catch (e) {
+      throw Exception("Error starting assessment attempt: ${e.toString()}");
+    }
+  }
+
+  static Future<AssessmentAttempt?> getCurrentAssessmentAttempt(int chapterId, int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/current?userId=$userId&chapterId=$chapterId'),
+      );
+
+      if (response.statusCode != 200) {
+        final dynamic body = jsonDecode(response.body);
+        final message = body is Map<String, dynamic>
+            ? (body['message'] ?? 'Gagal mengambil attempt aktif').toString()
+            : 'Gagal mengambil attempt aktif';
+        throw Exception(message);
+      }
+
+      if (response.body.trim().isEmpty || response.body.trim() == 'null') {
+        return null;
+      }
+
+      final dynamic result = jsonDecode(response.body);
+      if (result == null) {
+        return null;
+      }
+      if (result is! Map<String, dynamic>) {
+        throw Exception('Payload attempt aktif tidak valid');
+      }
+
+      return AssessmentAttempt.fromJson(result);
+    } catch (e) {
+      throw Exception("Error fetching current attempt: ${e.toString()}");
+    }
+  }
+
+  static Future<AssessmentAttempt?> getLatestAssessmentAttempt(int chapterId, int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/latest?userId=$userId&chapterId=$chapterId'),
+      );
+
+      if (response.statusCode != 200) {
+        final dynamic body = jsonDecode(response.body);
+        final message = body is Map<String, dynamic>
+            ? (body['message'] ?? 'Gagal mengambil attempt terakhir').toString()
+            : 'Gagal mengambil attempt terakhir';
+        throw Exception(message);
+      }
+
+      if (response.body.trim().isEmpty || response.body.trim() == 'null') {
+        return null;
+      }
+
+      final dynamic result = jsonDecode(response.body);
+      if (result == null) {
+        return null;
+      }
+      if (result is! Map<String, dynamic>) {
+        throw Exception('Payload attempt terakhir tidak valid');
+      }
+
+      return AssessmentAttempt.fromJson(result);
+    } catch (e) {
+      throw Exception("Error fetching latest attempt: ${e.toString()}");
     }
   }
 
