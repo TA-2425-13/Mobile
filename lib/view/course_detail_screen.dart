@@ -1,6 +1,7 @@
 import 'package:app/model/chapter.dart';
 import 'package:app/model/chapter_status.dart';
 import 'package:app/service/badge_service.dart';
+import 'package:app/service/chapter_service.dart';
 import 'package:app/service/course_service.dart';
 import 'package:app/service/user_chapter_service.dart';
 import 'package:app/service/user_course_service.dart';
@@ -22,7 +23,7 @@ class CourseDetailScreen extends StatefulWidget {
   const CourseDetailScreen({super.key, required this.id});
 
   @override
-  State<CourseDetailScreen> createState()  => _CourseDetail();
+  State<CourseDetailScreen> createState() => _CourseDetail();
 }
 
 class _CourseDetail extends State<CourseDetailScreen> {
@@ -44,7 +45,8 @@ class _CourseDetail extends State<CourseDetailScreen> {
   }
 
   Future<void> updateStatus(index) async {
-    final result = await UserChapterService.updateChapterStatus(listChapter[index].status!.id, listChapter[index].status!);
+    final result = await UserChapterService.updateChapterStatus(
+        listChapter[index].status!.id, listChapter[index].status!);
     setState(() {
       listChapter[index].status = result;
     });
@@ -60,10 +62,10 @@ class _CourseDetail extends State<CourseDetailScreen> {
       idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
     });
     final idUser = pref.getInt('userId');
-    if(idUser != null) {
+    if (idUser != null) {
       getUser(idUser);
     }
-    if(idCourse != 0){
+    if (idCourse != 0) {
       final result = await CourseService.getCourse(idCourse);
       setState(() {
         courseDetail = result;
@@ -101,12 +103,13 @@ class _CourseDetail extends State<CourseDetailScreen> {
 
   Future<List<Chapter>> getStatusChapter(List<Chapter> list) async {
     await Future.forEach(list, (Chapter chapter) async {
-      chapter.status = await UserChapterService.getChapterStatus(idUser, chapter.id);
+      chapter.status =
+          await UserChapterService.getChapterStatus(idUser, chapter.id);
     });
     return list;
   }
 
-  void getUserFromSharedPreference() async{
+  void getUserFromSharedPreference() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       idUser = prefs.getInt('userId') ?? 0;
@@ -118,29 +121,33 @@ class _CourseDetail extends State<CourseDetailScreen> {
 
   int idOfBadge(int isCheckpoint) {
     int idbadge = 0;
-    switch(isCheckpoint) {
-      case 1 : {
-        for(BadgeModel i in listBadge!) {
-          if(i.type == 'BEGINNER') {
-            idbadge = i.id;
+    switch (isCheckpoint) {
+      case 1:
+        {
+          for (BadgeModel i in listBadge!) {
+            if (i.type == 'BEGINNER') {
+              idbadge = i.id;
+            }
           }
         }
-      }
-      case 2 : {
-        for(BadgeModel i in listBadge!) {
-          if(i.type == 'INTERMEDIATE') {
-            idbadge = i.id;
+      case 2:
+        {
+          for (BadgeModel i in listBadge!) {
+            if (i.type == 'INTERMEDIATE') {
+              idbadge = i.id;
+            }
           }
         }
-      }
-      case 3 : {
-        for(BadgeModel i in listBadge!) {
-          if(i.type == 'ADVANCE') {
-            idbadge = i.id;
+      case 3:
+        {
+          for (BadgeModel i in listBadge!) {
+            if (i.type == 'ADVANCE') {
+              idbadge = i.id;
+            }
           }
         }
-      }
-      default : idbadge = 0;
+      default:
+        idbadge = 0;
     }
     return idbadge;
   }
@@ -159,93 +166,113 @@ class _CourseDetail extends State<CourseDetailScreen> {
             image: DecorationImage(
                 image: AssetImage("lib/assets/learnbg.png"),
                 fit: BoxFit.cover,
-                opacity: 0.7
-            ),
+                opacity: 0.7),
           ),
         ),
         idCourse != 0 && courseDetail != null
-        ? Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            centerTitle: true,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text('Level', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
-                const SizedBox(height: 4),
-                Text(
-                  courseDetail!.courseName,
-                  style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.primaryColor,
-            titleTextStyle: TextStyle(
-                fontFamily: 'DIN_Next_Rounded',
-                fontSize: 24,
-                color: Colors.white
-            ),
-            iconTheme: IconThemeData(
-              color: Colors.white,
-            ),
-          ),
-          body: isLoading
-          ? SizedBox(
-            width: double.infinity,
-            height: double.infinity,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 10),
-                  Text("Mohon Tunggu", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded'),
-                  ),
-                ],
-              ),
-            )
-          )
-          : Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: ListView.builder(
-              itemCount: listChapter.length,
-              itemBuilder: (context, count) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-                  child: count <= uc!.currentChapter - 1 ? _buildCourseItem(count) : _buildCourseItemLocked(count),
-                );
-              },
-            ),
-          ),
-        )
-        : Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Container(
-            decoration: BoxDecoration(
-                image: DecorationImage(
-                    image: AssetImage(
-                        'lib/assets/pictures/background-pattern.png'),
-                    fit: BoxFit.cover
-                )
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            ? Scaffold(
+                backgroundColor: Colors.transparent,
+                appBar: AppBar(
+                  automaticallyImplyLeading: false,
+                  centerTitle: true,
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Image.asset('lib/assets/pixels/lock-pixel.png', height: 50,),
-                      SizedBox(height: 16,),
-                      Text('Belum ada Course yang dikerjakan', textAlign: TextAlign.center, style: TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold,color: AppColors.primaryColor),),
-                      Text('Akses course terlebih dahulu untuk mengaktifkan halaman ini!', textAlign: TextAlign.center, style: TextStyle(fontFamily: 'DIN_Next_Rounded'),),
+                      Text('Level',
+                          style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                      const SizedBox(height: 4),
+                      Text(
+                        courseDetail!.courseName,
+                        style: TextStyle(
+                            fontSize: 12, fontFamily: 'DIN_Next_Rounded'),
+                      ),
                     ],
-                  )
+                  ),
+                  backgroundColor: AppColors.primaryColor,
+                  titleTextStyle: TextStyle(
+                      fontFamily: 'DIN_Next_Rounded',
+                      fontSize: 24,
+                      color: Colors.white),
+                  iconTheme: IconThemeData(
+                    color: Colors.white,
+                  ),
+                ),
+                body: isLoading
+                    ? SizedBox(
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 10),
+                              Text(
+                                "Mohon Tunggu",
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'DIN_Next_Rounded'),
+                              ),
+                            ],
+                          ),
+                        ))
+                    : Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: ListView.builder(
+                          itemCount: listChapter.length,
+                          itemBuilder: (context, count) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 0, vertical: 0),
+                              child: count <= uc!.currentChapter - 1
+                                  ? _buildCourseItem(count)
+                                  : _buildCourseItemLocked(count),
+                            );
+                          },
+                        ),
+                      ),
+              )
+            : Scaffold(
+                backgroundColor: Colors.transparent,
+                body: Container(
+                  decoration: BoxDecoration(
+                      image: DecorationImage(
+                          image: AssetImage(
+                              'lib/assets/pictures/background-pattern.png'),
+                          fit: BoxFit.cover)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(
+                        child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'lib/assets/pixels/lock-pixel.png',
+                          height: 50,
+                        ),
+                        SizedBox(
+                          height: 16,
+                        ),
+                        Text(
+                          'Belum ada Course yang dikerjakan',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontFamily: 'DIN_Next_Rounded',
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryColor),
+                        ),
+                        Text(
+                          'Akses course terlebih dahulu untuk mengaktifkan halaman ini!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                        ),
+                      ],
+                    )),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -254,7 +281,9 @@ class _CourseDetail extends State<CourseDetailScreen> {
     final chapter = listChapter[index];
 
     return Padding(
-      padding: index == listChapter.length - 1 ? EdgeInsets.only(top: 32, bottom: 16) : EdgeInsets.only(top: 32),
+      padding: index == listChapter.length - 1
+          ? EdgeInsets.only(top: 32, bottom: 16)
+          : EdgeInsets.only(top: 32),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -267,9 +296,16 @@ class _CourseDetail extends State<CourseDetailScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: () async {
-                uc?.currentChapter = uc!.currentChapter < chapter.level ? chapter.level : uc!.currentChapter;
+                ChapterService.warmupAssessmentAttempt(chapter.id, user!.id)
+                    .catchError((_) {
+                  // Best effort warmup only.
+                });
+
+                uc?.currentChapter = uc!.currentChapter < chapter.level
+                    ? chapter.level
+                    : uc!.currentChapter;
                 updateUserCourse();
-                if (!chapter.status!.isStarted){
+                if (!chapter.status!.isStarted) {
                   chapter.status?.timeStarted = DateTime.now();
                   chapter.status?.isStarted = true;
                 }
@@ -293,23 +329,28 @@ class _CourseDetail extends State<CourseDetailScreen> {
 
                 if (result != null) {
                   setState(() {
-                    listChapter[result['index']].status = ChapterStatus.fromJson(result['status']);
+                    listChapter[result['index']].status =
+                        ChapterStatus.fromJson(result['status']);
                   });
                 }
               },
               child: Padding(
-                padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 16),
+                padding: const EdgeInsets.only(
+                    top: 16, left: 16, right: 16, bottom: 16),
                 child: Column(
                   children: [
                     SizedBox(height: 48), // Space for the floating badge
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildStatusIcon(chapter.status!.materialDone, Icons.menu_book),
+                        _buildStatusIcon(
+                            chapter.status!.materialDone, Icons.menu_book),
                         SizedBox(width: 10),
-                        _buildStatusIcon(chapter.status!.assessmentDone, Icons.task),
+                        _buildStatusIcon(
+                            chapter.status!.assessmentDone, Icons.task),
                         SizedBox(width: 10),
-                        _buildStatusIcon(chapter.status!.assignmentDone, Icons.file_copy),
+                        _buildStatusIcon(
+                            chapter.status!.assignmentDone, Icons.file_copy),
                       ],
                     ),
                     SizedBox(height: 8),
@@ -317,21 +358,19 @@ class _CourseDetail extends State<CourseDetailScreen> {
                       chapter.name,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        color: Colors.white,
-                          fontFamily: 'DIN_Next_Rounded'
-                      ),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          color: Colors.white,
+                          fontFamily: 'DIN_Next_Rounded'),
                     ),
                     SizedBox(height: 4),
                     Text(
                       chapter.description,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                          fontFamily: 'DIN_Next_Rounded'
-                      ),
+                          fontSize: 14,
+                          color: Colors.white70,
+                          fontFamily: 'DIN_Next_Rounded'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -341,39 +380,39 @@ class _CourseDetail extends State<CourseDetailScreen> {
             ),
           ),
           listChapter[index].isCheckpoint == 1
-          ? Positioned(
-            top: 32, // Offset to be outside the card
-            right: 32,
-            child: Icon(
-              LineAwesomeIcons.medal_solid,
-              size: 50,
-              color: chapter.status!.materialDone && chapter.status!.assessmentDone && chapter.status!.assignmentDone
-              ? Colors.tealAccent :Colors.white54
-            )
-          )
-          : listChapter[index].isCheckpoint == 2
-          ? Positioned(
-            top: 32, // Offset to be outside the card
-            right: 32,
-            child: Icon(
-              LineAwesomeIcons.medal_solid,
-              size: 50,
-                color: chapter.status!.materialDone && chapter.status!.assessmentDone && chapter.status!.assignmentDone
-                ? Colors.blueAccent :Colors.white54
-            )
-          )
-          : listChapter[index].isCheckpoint == 3
-          ? Positioned(
-            top: 32, // Offset to be outside the card
-            right: 32,
-            child: Icon(
-              LineAwesomeIcons.medal_solid,
-              size: 50,
-                color: chapter.status!.materialDone && chapter.status!.assessmentDone && chapter.status!.assignmentDone
-                ? Colors.redAccent :Colors.white54
-            )
-          )
-          : SizedBox(),
+              ? Positioned(
+                  top: 32, // Offset to be outside the card
+                  right: 32,
+                  child: Icon(LineAwesomeIcons.medal_solid,
+                      size: 50,
+                      color: chapter.status!.materialDone &&
+                              chapter.status!.assessmentDone &&
+                              chapter.status!.assignmentDone
+                          ? Colors.tealAccent
+                          : Colors.white54))
+              : listChapter[index].isCheckpoint == 2
+                  ? Positioned(
+                      top: 32, // Offset to be outside the card
+                      right: 32,
+                      child: Icon(LineAwesomeIcons.medal_solid,
+                          size: 50,
+                          color: chapter.status!.materialDone &&
+                                  chapter.status!.assessmentDone &&
+                                  chapter.status!.assignmentDone
+                              ? Colors.blueAccent
+                              : Colors.white54))
+                  : listChapter[index].isCheckpoint == 3
+                      ? Positioned(
+                          top: 32, // Offset to be outside the card
+                          right: 32,
+                          child: Icon(LineAwesomeIcons.medal_solid,
+                              size: 50,
+                              color: chapter.status!.materialDone &&
+                                      chapter.status!.assessmentDone &&
+                                      chapter.status!.assignmentDone
+                                  ? Colors.redAccent
+                                  : Colors.white54))
+                      : SizedBox(),
           // Floating Level Badge
           Positioned(
             top: -25, // Offset to be outside the card
@@ -406,7 +445,8 @@ class _CourseDetail extends State<CourseDetailScreen> {
                           fontFamily: 'Modak',
                           shadows: [
                             Shadow(
-                              color: Colors.green.shade900.withOpacity(0.7), // Shadow behind text
+                              color: Colors.green.shade900
+                                  .withOpacity(0.7), // Shadow behind text
                               blurRadius: 0,
                               offset: Offset(3, 3),
                             ),
@@ -428,7 +468,9 @@ class _CourseDetail extends State<CourseDetailScreen> {
     final chapter = listChapter[index];
 
     return Padding(
-      padding: index == listChapter.length - 1 ? EdgeInsets.only(top: 32, bottom: 16) : EdgeInsets.only(top: 32),
+      padding: index == listChapter.length - 1
+          ? EdgeInsets.only(top: 32, bottom: 16)
+          : EdgeInsets.only(top: 32),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -443,17 +485,23 @@ class _CourseDetail extends State<CourseDetailScreen> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(15),
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 16),
+                  padding: const EdgeInsets.only(
+                      top: 16, left: 16, right: 16, bottom: 16),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(height: 40,),
+                      SizedBox(
+                        height: 40,
+                      ),
                       Icon(Icons.lock, size: 50, color: AppColors.darkGrey),
                       SizedBox(height: 10),
                       Text(
                         "Selesaikan dahulu level sebelumnya!",
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, color: AppColors.darkGrey, fontFamily: 'DIN_Next_Rounded'),
+                        style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.darkGrey,
+                            fontFamily: 'DIN_Next_Rounded'),
                       ),
                     ],
                   ),
@@ -479,7 +527,8 @@ class _CourseDetail extends State<CourseDetailScreen> {
                       color: Colors.green.shade900.withOpacity(0.8),
                       blurRadius: 10, // Increased for a softer shadow
                       spreadRadius: 2,
-                      offset: Offset(0, 6), // Adjusted offset for realistic shadowing
+                      offset: Offset(
+                          0, 6), // Adjusted offset for realistic shadowing
                     ),
                   ],
                 ),

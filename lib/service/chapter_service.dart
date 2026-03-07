@@ -9,48 +9,102 @@ import '../model/chapter.dart';
 import '../model/learning_material.dart';
 
 class ChapterService {
+  static final Map<String, Future<AssessmentAttempt?>>
+      _assessmentWarmupInFlight = {};
+
+  static String _attemptWarmupKey(int chapterId, int userId) =>
+      '$userId:$chapterId';
+
+  static Future<AssessmentAttempt?> warmupAssessmentAttempt(
+      int chapterId, int userId) async {
+    final key = _attemptWarmupKey(chapterId, userId);
+    final inFlight = _assessmentWarmupInFlight[key];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = (() async {
+      final latestAttempt = await getLatestAssessmentAttempt(chapterId, userId);
+      if (latestAttempt != null) {
+        return null;
+      }
+
+      final currentAttempt =
+          await getCurrentAssessmentAttempt(chapterId, userId);
+      if (currentAttempt != null) {
+        return currentAttempt;
+      }
+
+      return prefetchAssessmentAttempt(chapterId, userId);
+    })();
+
+    _assessmentWarmupInFlight[key] = future;
+
+    try {
+      return await future;
+    } finally {
+      if (identical(_assessmentWarmupInFlight[key], future)) {
+        _assessmentWarmupInFlight.remove(key);
+      }
+    }
+  }
+
+  static Future<AssessmentAttempt?> waitForAssessmentWarmup(
+      int chapterId, int userId) async {
+    final key = _attemptWarmupKey(chapterId, userId);
+    final inFlight = _assessmentWarmupInFlight[key];
+    if (inFlight == null) {
+      return null;
+    }
+    return inFlight;
+  }
 
   static Future<LearningMaterial> getMaterialByChapterId(int id) async {
     try {
-      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/materials'));
+      final response = await ApiCacheService.get(
+          Uri.parse('${GlobalVar.baseUrl}/chapter/$id/materials'));
       final body = response.body;
       final result = jsonDecode(body);
       LearningMaterial chapter = LearningMaterial(
-                  id: result['id'],
-                  chapterId: result['chapterId'],
-                  name: result['name'],
-                  content: result['content'],
-                  createdAt: DateTime.parse(result['createdAt']),
-                  updatedAt: DateTime.parse(result['updatedAt']),
-          );
+        id: result['id'],
+        chapterId: result['chapterId'],
+        name: result['name'],
+        content: result['content'],
+        createdAt: DateTime.parse(result['createdAt']),
+        updatedAt: DateTime.parse(result['updatedAt']),
+      );
       return chapter;
-    } catch(e){
+    } catch (e) {
       throw Exception(e.toString());
     }
   }
 
   static Future<Assessment> getAssessmentByChapterId(int id) async {
     try {
-      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assessments'));
+      final response = await ApiCacheService.get(
+          Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assessments'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
         throw Exception("No assessments found");
       }
 
-      final List<dynamic> decodeQuestion = result['questions'] == null 
-          ? [] 
-          : (result['questions'] is String 
-              ? jsonDecode(result['questions']) 
+      final List<dynamic> decodeQuestion = result['questions'] == null
+          ? []
+          : (result['questions'] is String
+              ? jsonDecode(result['questions'])
               : result['questions']);
-      List<Question> questions = decodeQuestion.map((q) => Question(
-        id: q['id'],
-        question: q['question'] ?? 'No question text',
-        option: q['options'] != null ? List<String>.from(q['options']) : [],
-        correctedAnswer: q['correctedAnswer'] ?? q['answer'] ?? '',
-        type: q['type'] ?? 'PG',
-        elo: q['elo'] ?? 1200,
-      )).toList();
+      List<Question> questions = decodeQuestion
+          .map((q) => Question(
+                id: q['id'],
+                question: q['question'] ?? 'No question text',
+                option:
+                    q['options'] != null ? List<String>.from(q['options']) : [],
+                correctedAnswer: q['correctedAnswer'] ?? q['answer'] ?? '',
+                type: q['type'] ?? 'PG',
+                elo: q['elo'] ?? 1200,
+              ))
+          .toList();
 
       // Decode answers safely (null-safe handling)
       final List<String>? decodedAnswers = result['answers'] != null
@@ -73,7 +127,9 @@ class ChapterService {
     }
   }
 
-  static Future<AssessmentAttempt> startAssessmentAttempt(int chapterId, int userId, {bool forceNew = false}) async {
+  static Future<AssessmentAttempt> startAssessmentAttempt(
+      int chapterId, int userId,
+      {bool forceNew = false}) async {
     try {
       final response = await http.post(
         Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/start'),
@@ -103,7 +159,8 @@ class ChapterService {
     }
   }
 
-  static Future<AssessmentAttempt> prefetchAssessmentAttempt(int chapterId, int userId) async {
+  static Future<AssessmentAttempt> prefetchAssessmentAttempt(
+      int chapterId, int userId) async {
     try {
       final response = await http.post(
         Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/prefetch'),
@@ -170,10 +227,12 @@ class ChapterService {
     }
   }
 
-  static Future<AssessmentAttempt?> getCurrentAssessmentAttempt(int chapterId, int userId) async {
+  static Future<AssessmentAttempt?> getCurrentAssessmentAttempt(
+      int chapterId, int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/current?userId=$userId&chapterId=$chapterId'),
+        Uri.parse(
+            '${GlobalVar.baseUrl}/assessment/attempt/current?userId=$userId&chapterId=$chapterId'),
       );
 
       if (response.statusCode != 200) {
@@ -202,10 +261,12 @@ class ChapterService {
     }
   }
 
-  static Future<AssessmentAttempt?> getLatestAssessmentAttempt(int chapterId, int userId) async {
+  static Future<AssessmentAttempt?> getLatestAssessmentAttempt(
+      int chapterId, int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('${GlobalVar.baseUrl}/assessment/attempt/latest?userId=$userId&chapterId=$chapterId'),
+        Uri.parse(
+            '${GlobalVar.baseUrl}/assessment/attempt/latest?userId=$userId&chapterId=$chapterId'),
       );
 
       if (response.statusCode != 200) {
@@ -236,7 +297,8 @@ class ChapterService {
 
   static Future<Assignment> getAssignmentByChapterId(int id) async {
     try {
-      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assignments'));
+      final response = await ApiCacheService.get(
+          Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assignments'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
@@ -251,9 +313,10 @@ class ChapterService {
     }
   }
 
-  static Future<Chapter> getChapterById(int id) async{
+  static Future<Chapter> getChapterById(int id) async {
     try {
-      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/chapter/$id'));
+      final response = await ApiCacheService.get(
+          Uri.parse('${GlobalVar.baseUrl}/chapter/$id'));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
@@ -268,16 +331,16 @@ class ChapterService {
     }
   }
 
-  static Future<double> checkSimiliarity (String reference, String answer) async {
-    Map<String, dynamic> request = {
-      'reference': reference,
-      'essay': answer
-    };
+  static Future<double> checkSimiliarity(
+      String reference, String answer) async {
+    Map<String, dynamic> request = {'reference': reference, 'essay': answer};
     try {
-      final response = await http.post(Uri.parse(GlobalVar.similiarityEssayUrl), headers: {
-        'Content-type' : 'application/json',
-        'Accept': 'application/json',
-      } , body: jsonEncode(request));
+      final response = await http.post(Uri.parse(GlobalVar.similiarityEssayUrl),
+          headers: {
+            'Content-type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(request));
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {

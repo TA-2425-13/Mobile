@@ -120,7 +120,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
   void _applyAttempt(AssessmentAttempt attempt, {required bool lockMaterial}) {
     final question = attempt.currentQuestion ??
-        (attempt.questions.isNotEmpty ? _copyQuestion(attempt.questions.last) : null);
+        (attempt.questions.isNotEmpty
+            ? _copyQuestion(attempt.questions.last)
+            : null);
 
     final mergedQuestions = <Question>[];
     for (final q in attempt.questions) {
@@ -159,6 +161,20 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     });
 
     try {
+      // If chapter-level warmup is still running, wait for it first so generation is done earlier.
+      await ChapterService.waitForAssessmentWarmup(status.chapterId, user!.id);
+
+      final currentAttempt = await ChapterService.getCurrentAssessmentAttempt(
+        status.chapterId,
+        user!.id,
+      );
+      if (!mounted) return;
+      if (currentAttempt != null) {
+        _forceNewOnNextStart = false;
+        _applyAttempt(currentAttempt, lockMaterial: true);
+        return;
+      }
+
       final startedAttempt = await ChapterService.startAssessmentAttempt(
         status.chapterId,
         user!.id,
@@ -169,7 +185,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       _forceNewOnNextStart = false;
       _applyAttempt(startedAttempt, lockMaterial: true);
       if (startedAttempt.source == 'FALLBACK_BANK') {
-        _showInfo('LLM belum berhasil generate soal, sistem memakai bank soal cadangan.');
+        _showInfo(
+            'LLM belum berhasil generate soal, sistem memakai bank soal cadangan.');
       }
     } catch (error) {
       _showError('Gagal memulai assessment', error.toString());
@@ -183,7 +200,10 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   }
 
   Future<void> _submitCurrentQuestion() async {
-    if (_isSubmittingAnswer || _attemptId == null || user == null || _currentQuestion == null) {
+    if (_isSubmittingAnswer ||
+        _attemptId == null ||
+        user == null ||
+        _currentQuestion == null) {
       return;
     }
 
@@ -193,7 +213,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       return;
     }
     final normalizedType = current.type.toUpperCase();
-    final answer = normalizedType == 'EY' ? _essayController.text.trim() : _selectedChoice.trim();
+    final answer = normalizedType == 'EY'
+        ? _essayController.text.trim()
+        : _selectedChoice.trim();
 
     if (answer.isEmpty) {
       _showInfo('Jawaban tidak boleh kosong.');
@@ -228,7 +250,11 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       final isCorrect = response['isCorrect'] == true;
       current.isCorrect = isCorrect;
       current.score = isCorrect
-          ? (100 / (_progress.objectiveTarget == 0 ? 1 : _progress.objectiveTarget)).ceil()
+          ? (100 /
+                  (_progress.objectiveTarget == 0
+                      ? 1
+                      : _progress.objectiveTarget))
+              .ceil()
           : 0;
       _upsertServedQuestion(current);
 
@@ -255,18 +281,22 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           _courseEloAfter = (response['courseEloAfter'] as num).toInt();
         }
         if (response['targetNextQuestionElo'] != null) {
-          _targetNextQuestionElo = (response['targetNextQuestionElo'] as num).toInt();
+          _targetNextQuestionElo =
+              (response['targetNextQuestionElo'] as num).toInt();
         }
         if (response['eloDeltaQuestion'] != null) {
           _eloDeltaQuestion = (response['eloDeltaQuestion'] as num).toDouble();
         }
         if (response['pointsAwardedPreview'] != null) {
-          _pointsAwardedPreview = (response['pointsAwardedPreview'] as num).toDouble();
+          _pointsAwardedPreview =
+              (response['pointsAwardedPreview'] as num).toDouble();
         }
       });
 
       if (normalizedType != 'EY') {
-        _showInfo(isCorrect ? 'Benar. Soal berikutnya akan menyesuaikan Elo kamu.' : 'Salah. Soal berikutnya akan menyesuaikan Elo kamu.');
+        _showInfo(isCorrect
+            ? 'Benar. Soal berikutnya akan menyesuaikan Elo kamu.'
+            : 'Salah. Soal berikutnya akan menyesuaikan Elo kamu.');
       }
     } catch (error) {
       _showError('Gagal submit jawaban', error.toString());
@@ -282,7 +312,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   Future<void> _reloadLatestAttemptForResult() async {
     if (user == null) return;
     try {
-      final latestAttempt = await ChapterService.getLatestAssessmentAttempt(status.chapterId, user!.id);
+      final latestAttempt = await ChapterService.getLatestAssessmentAttempt(
+          status.chapterId, user!.id);
       if (!mounted || latestAttempt == null) return;
       setState(() {
         _servedQuestions = latestAttempt.questions.map(_copyQuestion).toList();
@@ -305,7 +336,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       status.assessmentDone = true;
       status.assessmentGrade = _grade;
       status.assessmentEloDelta = _pointsEarned;
-      status.assessmentAnswer = _servedQuestions.map((q) => q.selectedAnswer).toList();
+      status.assessmentAnswer =
+          _servedQuestions.map((q) => q.selectedAnswer).toList();
       user?.points = (user?.points ?? 0) + _pointsEarned;
     });
 
@@ -342,21 +374,28 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
   Question _questionFromJson(Map<String, dynamic> map) {
     final optionsRaw = map['options'];
-    final options = optionsRaw is List ? optionsRaw.map((e) => e.toString()).toList() : <String>[];
+    final options = optionsRaw is List
+        ? optionsRaw.map((e) => e.toString()).toList()
+        : <String>[];
     final q = Question(
       id: map['id'] is int ? map['id'] as int : int.tryParse('${map['id']}'),
       question: (map['question'] ?? '').toString(),
       option: options,
-      correctedAnswer: (map['correctedAnswer'] ?? map['answer'] ?? '').toString(),
+      correctedAnswer:
+          (map['correctedAnswer'] ?? map['answer'] ?? '').toString(),
       type: (map['type'] ?? 'MC').toString(),
-      elo: map['elo'] is int ? map['elo'] as int : int.tryParse('${map['elo']}') ?? 1200,
+      elo: map['elo'] is int
+          ? map['elo'] as int
+          : int.tryParse('${map['elo']}') ?? 1200,
     );
     final submitted = (map['submittedAnswer'] ?? '').toString();
     if (submitted.isNotEmpty) {
       q.selectedAnswer = submitted;
     }
     q.isCorrect = map['isCorrect'] == true;
-    q.score = map['score'] is int ? map['score'] as int : int.tryParse('${map['score']}') ?? 0;
+    q.score = map['score'] is int
+        ? map['score'] as int
+        : int.tryParse('${map['score']}') ?? 0;
     return q;
   }
 
@@ -372,7 +411,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   void _showInfo(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message, style: const TextStyle(fontFamily: 'DIN_Next_Rounded'))),
+      SnackBar(
+          content: Text(message,
+              style: const TextStyle(fontFamily: 'DIN_Next_Rounded'))),
     );
   }
 
@@ -382,7 +423,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text(title),
-        content: Text(message, style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
+        content: Text(message,
+            style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -445,10 +487,16 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor),
-                    onPressed: _isStartingAttempt ? null : _startAssessmentAttempt,
-                    icon: const Icon(LineAwesomeIcons.paper_plane, color: Colors.white),
-                    label: const Text('Mulai', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded')),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor),
+                    onPressed:
+                        _isStartingAttempt ? null : _startAssessmentAttempt,
+                    icon: const Icon(LineAwesomeIcons.paper_plane,
+                        color: Colors.white),
+                    label: const Text('Mulai',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'DIN_Next_Rounded')),
                   ),
                 ),
               ],
@@ -469,10 +517,12 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     final progressValue = (_progress.totalTarget <= 0)
         ? 0.0
         : (_progress.answeredCount / _progress.totalTarget).clamp(0.0, 1.0);
-    
-    final mcCount = _servedQuestions.where((q) => q.type.toUpperCase() == 'MC').length;
-    final tfCount = _servedQuestions.where((q) => q.type.toUpperCase() == 'TF').length;
-    
+
+    final mcCount =
+        _servedQuestions.where((q) => q.type.toUpperCase() == 'MC').length;
+    final tfCount =
+        _servedQuestions.where((q) => q.type.toUpperCase() == 'TF').length;
+
     return Container(
       decoration: const BoxDecoration(
         image: DecorationImage(
@@ -489,108 +539,138 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 child: Column(
                   children: [
                     LinearProgressIndicator(
-              value: progressValue,
-              backgroundColor: Colors.grey.shade300,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryColor),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Terjawab ${_progress.answeredCount}/${_progress.totalTarget}',
-                  style: const TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Kuota MC: $mcCount/4 | TF: $tfCount/1',
-                  style: const TextStyle(fontFamily: 'DIN_Next_Rounded', fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_courseEloBefore != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      value: progressValue,
+                      backgroundColor: Colors.grey.shade300,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.primaryColor),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Elo Berjalan', style: const TextStyle(fontFamily: 'DIN_Next_Rounded', fontSize: 12, color: Colors.grey)),
-                        Text('${_courseEloAfter ?? _courseEloBefore}', style: const TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold, color: AppColors.primaryColor)),
+                        Text(
+                          'Terjawab ${_progress.answeredCount}/${_progress.totalTarget}',
+                          style: const TextStyle(
+                              fontFamily: 'DIN_Next_Rounded',
+                              fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Kuota MC: $mcCount/4 | TF: $tfCount/1',
+                          style: const TextStyle(
+                              fontFamily: 'DIN_Next_Rounded', fontSize: 12),
+                        ),
                       ],
                     ),
-                    if (_eloDeltaQuestion != null && _eloDeltaQuestion != 0)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text('Delta Soal', style: const TextStyle(fontFamily: 'DIN_Next_Rounded', fontSize: 12, color: Colors.grey)),
-                          Text(
-                            '${_eloDeltaQuestion! > 0 ? '+' : ''}${_eloDeltaQuestion!.toStringAsFixed(1)}',
-                            style: TextStyle(
-                              fontFamily: 'DIN_Next_Rounded',
-                              fontWeight: FontWeight.bold,
-                              color: _eloDeltaQuestion! > 0 ? Colors.green : Colors.red,
+                    const SizedBox(height: 8),
+                    if (_courseEloBefore != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.primaryColor.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Elo Berjalan',
+                                    style: const TextStyle(
+                                        fontFamily: 'DIN_Next_Rounded',
+                                        fontSize: 12,
+                                        color: Colors.grey)),
+                                Text('${_courseEloAfter ?? _courseEloBefore}',
+                                    style: const TextStyle(
+                                        fontFamily: 'DIN_Next_Rounded',
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primaryColor)),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            if (_targetNextQuestionElo != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Target Elo Soal Saat Ini: $_targetNextQuestionElo',
-                    style: const TextStyle(fontFamily: 'DIN_Next_Rounded', fontSize: 12, fontStyle: FontStyle.italic),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 8),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(current.question, style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
-                    const SizedBox(height: 12),
-                    if (type == 'MC' || type == 'TF') ...[
-                      ...current.option.map((opt) => RadioListTile<String>(
-                            title: Text(opt, style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
-                            value: opt,
-                            groupValue: _selectedChoice,
-                            onChanged: _isSubmittingAnswer
-                                ? null
-                                : (value) {
-                                    setState(() {
-                                      _selectedChoice = value ?? '';
-                                    });
-                                  },
-                          )),
-                    ] else ...[
-                      TextField(
-                        controller: _essayController,
-                        maxLines: 4,
-                        decoration: const InputDecoration(
-                          hintText: 'Ketik jawaban essay...',
-                          border: OutlineInputBorder(),
+                            if (_eloDeltaQuestion != null &&
+                                _eloDeltaQuestion != 0)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text('Delta Soal',
+                                      style: const TextStyle(
+                                          fontFamily: 'DIN_Next_Rounded',
+                                          fontSize: 12,
+                                          color: Colors.grey)),
+                                  Text(
+                                    '${_eloDeltaQuestion! > 0 ? '+' : ''}${_eloDeltaQuestion!.toStringAsFixed(1)}',
+                                    style: TextStyle(
+                                      fontFamily: 'DIN_Next_Rounded',
+                                      fontWeight: FontWeight.bold,
+                                      color: _eloDeltaQuestion! > 0
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
                       ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
+                    if (_targetNextQuestionElo != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Target Elo Soal Saat Ini: $_targetNextQuestionElo',
+                            style: const TextStyle(
+                                fontFamily: 'DIN_Next_Rounded',
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(current.question,
+                                style: const TextStyle(
+                                    fontFamily: 'DIN_Next_Rounded')),
+                            const SizedBox(height: 12),
+                            if (type == 'MC' || type == 'TF') ...[
+                              ...current.option
+                                  .map((opt) => RadioListTile<String>(
+                                        title: Text(opt,
+                                            style: const TextStyle(
+                                                fontFamily:
+                                                    'DIN_Next_Rounded')),
+                                        value: opt,
+                                        groupValue: _selectedChoice,
+                                        onChanged: _isSubmittingAnswer
+                                            ? null
+                                            : (value) {
+                                                setState(() {
+                                                  _selectedChoice = value ?? '';
+                                                });
+                                              },
+                                      )),
+                            ] else ...[
+                              TextField(
+                                controller: _essayController,
+                                maxLines: 4,
+                                decoration: const InputDecoration(
+                                  hintText: 'Ketik jawaban essay...',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -599,11 +679,13 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryColor),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryColor),
                 onPressed: _isSubmittingAnswer ? null : _submitCurrentQuestion,
                 child: Text(
                   _isSubmittingAnswer ? 'Mengirim...' : 'Kirim Jawaban',
-                  style: const TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded'),
+                  style: const TextStyle(
+                      color: Colors.white, fontFamily: 'DIN_Next_Rounded'),
                 ),
               ),
             ),
@@ -614,7 +696,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   }
 
   Widget _buildResultView() {
-    final objectiveTotal = _servedQuestions.where((q) => q.type.toUpperCase() != 'EY').length;
+    final objectiveTotal =
+        _servedQuestions.where((q) => q.type.toUpperCase() != 'EY').length;
     return Container(
       decoration: const BoxDecoration(
         image: DecorationImage(
@@ -633,13 +716,34 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Hasil Assessment', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded')),
+                    const Text('Hasil Assessment',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'DIN_Next_Rounded')),
                     const SizedBox(height: 8),
-                    Text('Jumlah Benar: $_correctAnswer / $objectiveTotal', style: const TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded')),
-                    Text('Skor: $_grade / 100', style: const TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded')),
+                    Text('Jumlah Benar: $_correctAnswer / $objectiveTotal',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'DIN_Next_Rounded')),
+                    Text('Skor: $_grade / 100',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'DIN_Next_Rounded')),
                     const Divider(color: Colors.white54, height: 24),
-                    Text('Elo Delta (Perubahan Elo Course): ${_pointsEarned > 0 ? '+' : ''}$_pointsEarned', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded')),
-                    Text('Points Earned (Gamifikasi): ${_pointsEarned > 0 ? _pointsEarned : 0}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded')),
+                    Text(
+                        'Elo Delta (Perubahan Elo Course): ${_pointsEarned > 0 ? '+' : ''}$_pointsEarned',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'DIN_Next_Rounded')),
+                    Text(
+                        'Points Earned (Gamifikasi): ${_pointsEarned > 0 ? _pointsEarned : 0}',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'DIN_Next_Rounded')),
                   ],
                 ),
               ),
@@ -647,15 +751,19 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             if (_newDifficultyLabel != null)
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.trending_up, color: AppColors.primaryColor),
-                  title: Text('Tingkat kesulitan berikutnya: $_newDifficultyLabel', style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                  leading: const Icon(Icons.trending_up,
+                      color: AppColors.primaryColor),
+                  title: Text(
+                      'Tingkat kesulitan berikutnya: $_newDifficultyLabel',
+                      style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
                 ),
               ),
             if (_aiFeedback != null)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Text(_aiFeedback!, style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                  child: Text(_aiFeedback!,
+                      style: const TextStyle(fontFamily: 'DIN_Next_Rounded')),
                 ),
               ),
           ],
