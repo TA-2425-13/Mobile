@@ -294,7 +294,7 @@ class _ProfileState extends State<ProfileScreen> {
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              spacing: 24,
+                              spacing: 16,
                               children: [
                                 _buildInfoColumn(LineAwesomeIcons.medal_solid,
                                     'Lencana', '${userBadges?.length}', GlobalVar.secondaryColor),
@@ -303,7 +303,9 @@ class _ProfileState extends State<ProfileScreen> {
                                 _buildInfoColumn(LineAwesomeIcons.trophy_solid,
                                     'Peringkat', '$rank / ${list.length}', GlobalVar.secondaryColor),
                                 _buildInfoColumn(LineAwesomeIcons.gem_solid,
-                                    'Poin', '${user?.points ?? 0}', GlobalVar.secondaryColor)
+                                    'Poin', '${user?.points ?? 0}', GlobalVar.secondaryColor),
+                                _buildInfoColumn(LineAwesomeIcons.fire_solid,
+                                    'ELO', '${user?.elo ?? 750}', GlobalVar.secondaryColor)
                               ],
                             ),
                           ),
