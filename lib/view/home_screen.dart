@@ -510,43 +510,52 @@ class _HomeState extends State<Homescreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start, // Align text to the left
-            children: [
-              Text(
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                      color: AppColors.primaryColor,
-                      fontFamily: 'DIN_Next_Rounded'
-                  )),
-              Text(
-                  name,
-                  style: Theme.of(context).textTheme.headlineLarge!.copyWith(
-                      color: AppColors.primaryColor,
-                      // fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'DIN_Next_Rounded'
-                  )),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.amber,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  user?.eloTitle ?? 'Beginner',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.primaryColor,
                     fontFamily: 'DIN_Next_Rounded',
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-            ],
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineLarge!.copyWith(
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'DIN_Next_Rounded',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    user?.eloTitle ?? 'Beginner',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'DIN_Next_Rounded',
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 12),
           GestureDetector(
             onTap: () => widget.updateIndex(4),
             child: Container(

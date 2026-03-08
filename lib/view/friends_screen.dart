@@ -228,142 +228,92 @@ class _FriendsScreen extends State<FriendsScreen> {
       height: 300,
       width: double.infinity,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              list.isNotEmpty && list.length >= 2 && list[1].image != "" && list[1].image != null ?
-              CircleAvatar(
-                  radius: 30,
-                  backgroundImage: NetworkImage(list[1].image!)) :
-              CircleAvatar(
-                  radius: 30,
-                  child: Icon(Icons.person, size: 20,)),
-              Text(list.isNotEmpty && list.length >= 2? list[1].name : '', style: TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DIN_Next_Rounded'),),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                    padding: EdgeInsets.all(10),
-                  child: Text('${list.isNotEmpty && list.length >= 2 ? list[1].points : 0} pts', style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),),
-                ),
-              ),
-              SizedBox(
-                height: 10,
-                width: 10,
-              ),
-              Container(
-                width: 75,
-                height: 120,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('lib/assets/leaderboards/banner-silver.png'),
-                    fit: BoxFit.fitWidth,
-                  ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(0),
-                    bottomLeft: Radius.circular(0),
-                    bottomRight: Radius.circular(0),
-                  ),
-                ),
-                // child: Center(child: Text('#2', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontSize: 24, fontWeight: FontWeight.w900)),),
-              )
-            ],
+          Expanded(
+            child: _buildPodiumItem(
+              student: list.length >= 2 ? list[1] : null,
+              bannerAsset: 'lib/assets/leaderboards/banner-silver.png',
+              podiumHeight: 120,
+            ),
           ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              list.isNotEmpty && list[0].image != "" && list[0].image != null ?
-              CircleAvatar(
-                  radius: 30,
-                  backgroundImage: NetworkImage(list[0].image!)) :
-              CircleAvatar(
-                  radius: 30,
-                  child: Icon(Icons.person, size: 20,)),
-              Text(list.isNotEmpty ? list[0].name : '', style: TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DIN_Next_Rounded'),),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('${list.isNotEmpty? list[0].points : 0} pts', style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),),
-                ),
-              ),
-              SizedBox(
-                height: 10,
-                width: 10,
-              ),
-              Container(
-                width: 75,
-                height: 150,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('lib/assets/leaderboards/banner-gold.png'),
-                    fit: BoxFit.fitWidth,
-                  ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                    bottomLeft: Radius.circular(0),
-                    bottomRight: Radius.circular(0),
-                  ),
-                ),
-                // child: Center(child: Text('#1', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontSize: 24, fontWeight: FontWeight.w900)),),
-              )
-            ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: _buildPodiumItem(
+              student: list.isNotEmpty ? list[0] : null,
+              bannerAsset: 'lib/assets/leaderboards/banner-gold.png',
+              podiumHeight: 150,
+            ),
           ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              list.isNotEmpty && list.length >= 3 && list[2].image != "" && list[2].image != null ?
-              CircleAvatar(
-                  radius: 30,
-                  backgroundImage: NetworkImage(list[2].image!)) :
-              CircleAvatar(
-                  radius: 30,
-                  child: Icon(Icons.person, size: 20,)),
-              Text(list.isNotEmpty && list.length >= 3 ? list[2].name : '', style: TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DIN_Next_Rounded'),),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('${list.isNotEmpty && list.length >= 3 ? list[2].points : 0} pts', style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),),
-                ),
-              ),
-              SizedBox(
-                height: 10,
-                width: 10,
-              ),
-              Container(
-                width: 75,
-                height: 90,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('lib/assets/leaderboards/banner-bronze.png'),
-                    fit: BoxFit.fitWidth,
-                  ),
-                  borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(0),
-                      topRight: Radius.circular(16),
-                      bottomLeft: Radius.circular(0),
-                      bottomRight: Radius.circular(0),
-                  ),
-                ),
-                // child: Center(child: Text('#3', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontSize: 24, fontWeight: FontWeight.w900)),),
-              )
-            ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: _buildPodiumItem(
+              student: list.length >= 3 ? list[2] : null,
+              bannerAsset: 'lib/assets/leaderboards/banner-bronze.png',
+              podiumHeight: 90,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPodiumItem({
+    required Student? student,
+    required String bannerAsset,
+    required double podiumHeight,
+  }) {
+    final image = student?.image;
+    final hasImage = image != null && image.isNotEmpty;
+    final displayName = student?.name ?? '';
+    final points = student?.points ?? 0;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        hasImage
+            ? CircleAvatar(radius: 30, backgroundImage: NetworkImage(image))
+            : const CircleAvatar(radius: 30, child: Icon(Icons.person, size: 20)),
+        const SizedBox(height: 8),
+        Text(
+          displayName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontFamily: 'DIN_Next_Rounded',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$points pts',
+            style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: 75,
+          height: podiumHeight,
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage(bannerAsset),
+              fit: BoxFit.fitWidth,
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
