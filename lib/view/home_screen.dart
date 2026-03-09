@@ -24,6 +24,8 @@ class Homescreen extends StatefulWidget {
 }
 
 class _HomeState extends State<Homescreen> {
+  static final Map<int, List<Course>> _enrolledCache = {};
+  static final Map<int, Student> _userCache = {};
 
   List<Course> allCourses = [];
   double progress = 0.88;
@@ -36,28 +38,62 @@ class _HomeState extends State<Homescreen> {
   int rank = 0;
   int idUser = 0;
   List<UserBadge>? userBadges = [];
+  bool _isFetchingEnrolled = false;
 
   @override
   void initState() {
     super.initState();
-    getUserFromSharedPreference().then((_) {
-      getAllUser();
-    });
-    getEnrolledCourse();
+    unawaited(_bootstrap());
+  }
+
+  Future<void> _bootstrap() async {
+    pref = await SharedPreferences.getInstance();
+    final storedIdUser = pref.getInt('userId');
+
+    if (storedIdUser != null) {
+      final cachedCourses = _enrolledCache[storedIdUser];
+      final cachedUser = _userCache[storedIdUser];
+
+      if (cachedCourses != null || cachedUser != null) {
+        setState(() {
+          idUser = storedIdUser;
+          allCourses = cachedCourses != null ? List<Course>.from(cachedCourses) : allCourses;
+          user = cachedUser ?? user;
+          isLoading = false;
+        });
+
+        final idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
+        for (final c in allCourses) {
+          if (c.id == idCourse) {
+            lastestCourse = c;
+            break;
+          }
+        }
+      }
+    }
+
+    await getUserFromSharedPreference();
+    unawaited(getEnrolledCourse());
+    unawaited(getAllUser());
   }
 
   Future<void> getEnrolledCourse() async{
+    if (_isFetchingEnrolled) {
+      return;
+    }
+
+    _isFetchingEnrolled = true;
     pref = await SharedPreferences.getInstance();
     int? id = pref.getInt('userId');
     if(id != null) {
       try {
         final result = await CourseService.getEnrolledCourse(id).timeout(Duration(seconds: 10));
-        final fetchedUser = await UserService.getUserById(id).timeout(Duration(seconds: 10));
+        if (!mounted) return;
         setState(() {
           allCourses = result;
-          user = fetchedUser;
           isLoading = false;
         });
+        _enrolledCache[id] = List<Course>.from(result);
         final idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
         for (var c in allCourses) {
           if(c.id == idCourse){
@@ -68,6 +104,7 @@ class _HomeState extends State<Homescreen> {
           }
         }
       } on TimeoutException catch (_) {
+        if (!mounted) return;
         setState(() {
           isLoading = false;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -75,6 +112,7 @@ class _HomeState extends State<Homescreen> {
           );
         });
       } catch (e) {
+        if (!mounted) return;
         setState(() {
           isLoading = false;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -82,7 +120,11 @@ class _HomeState extends State<Homescreen> {
           );
         });
         print('Error getEnrolledCourse: $e');
+      } finally {
+        _isFetchingEnrolled = false;
       }
+    } else {
+      _isFetchingEnrolled = false;
     }
   }
 
@@ -133,11 +175,13 @@ class _HomeState extends State<Homescreen> {
     final storedIdUser = prefs.getInt('userId');
     if (storedIdUser != null) {
       final fetchedUser = await UserService.getUserById(storedIdUser);
+      if (!mounted) return;
       setState(() {
         idUser = storedIdUser;
         name = prefs.getString('name') ?? '';
         user = fetchedUser;
       });
+      _userCache[storedIdUser] = fetchedUser;
       getUserBadges(storedIdUser);
     } else {
       logout();
@@ -145,7 +189,16 @@ class _HomeState extends State<Homescreen> {
   }
 
   Future<void> getUserBadges(int userId) async {
-    final result = await BadgeService.getUserBadgeListByUserId(userId);
+    final result = await BadgeService.getUserBadgeListByUserId(
+      userId,
+      onRevalidated: (freshBadges) {
+        if (!mounted) return;
+        setState(() {
+          userBadges = freshBadges;
+        });
+      },
+    );
+    if (!mounted) return;
     setState(() {
       userBadges = result;
     });
@@ -572,6 +625,11 @@ class _HomeState extends State<Homescreen> {
                   width: 50,
                   height: 50,
                   fit: BoxFit.cover, // Ensures the image fills the container
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.person,
+                    size: 30,
+                    color: Colors.white,
+                  ),
                 )
                     : Center(
                   child: Icon(
@@ -836,7 +894,7 @@ class _HomeState extends State<Homescreen> {
       ) {
     return GestureDetector(
       onTap: () async {
-        await pref.setInt('lastestSelectedCourse', course.id);
+        unawaited(pref.setInt('lastestSelectedCourse', course.id));
         widget.updateIndex(2);
       },
       child: Container(
@@ -860,7 +918,16 @@ class _HomeState extends State<Homescreen> {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: course.image != "" ? Image.network(course.image): Image.asset('lib/assets/pictures/imk-picture.jpg', fit: BoxFit.cover),
+                child: course.image != ""
+                    ? Image.network(
+                        course.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Image.asset(
+                          'lib/assets/pictures/imk-picture.jpg',
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Image.asset('lib/assets/pictures/imk-picture.jpg', fit: BoxFit.cover),
               ),
             ),
             Positioned(

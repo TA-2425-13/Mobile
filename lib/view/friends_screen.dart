@@ -272,7 +272,12 @@ class _FriendsScreen extends State<FriendsScreen> {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         hasImage
-            ? CircleAvatar(radius: 30, backgroundImage: NetworkImage(image))
+            ? CircleAvatar(
+                radius: 30,
+                backgroundImage: NetworkImage(image),
+                onBackgroundImageError: (_, __) {},
+                child: const Icon(Icons.person, size: 20),
+              )
             : const CircleAvatar(radius: 30, child: Icon(Icons.person, size: 20)),
         const SizedBox(height: 8),
         Text(

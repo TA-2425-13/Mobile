@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/model/chapter.dart';
 import 'package:app/model/chapter_status.dart';
 import 'package:app/service/badge_service.dart';
@@ -27,6 +29,11 @@ class CourseDetailScreen extends StatefulWidget {
 }
 
 class _CourseDetail extends State<CourseDetailScreen> {
+  static final Map<int, Course> _courseCache = {};
+  static final Map<int, List<BadgeModel>> _badgeCache = {};
+  static final Map<String, List<Chapter>> _chapterCache = {};
+  static final Map<String, UserCourse> _userCourseCache = {};
+
   Course? courseDetail;
   List<Chapter> listChapter = [];
   late SharedPreferences pref;
@@ -36,12 +43,77 @@ class _CourseDetail extends State<CourseDetailScreen> {
   UserCourse? uc;
   Student? user;
   List<BadgeModel>? listBadge;
+  bool _isBootstrapped = false;
+  bool _isFetchingCourse = false;
+  bool _isFetchingBadges = false;
+  bool _isFetchingChapters = false;
+  bool _isFetchingUserCourse = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    getCourseDetail();
-    getUserFromSharedPreference();
+  void initState() {
+    super.initState();
+    unawaited(_bootstrap());
+  }
+
+  String _chapterCacheKey() {
+    return '${idUser}_${idCourse}';
+  }
+
+  Future<void> _bootstrap() async {
+    if (_isBootstrapped) {
+      return;
+    }
+    _isBootstrapped = true;
+
+    pref = await SharedPreferences.getInstance();
+    idCourse = widget.id != 0 ? widget.id : (pref.getInt('lastestSelectedCourse') ?? 0);
+    idUser = pref.getInt('userId') ?? 0;
+
+    if (idCourse != 0) {
+      unawaited(pref.setInt('lastestSelectedCourse', idCourse));
+    }
+
+    _hydrateInstantCache();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      isLoading = listChapter.isEmpty;
+    });
+
+    if (idUser != 0) {
+      unawaited(getUser(idUser));
+      unawaited(getUserCourse());
+    }
+
+    if (idCourse != 0) {
+      unawaited(getCourseDetail());
+      unawaited(getChapter(idCourse));
+      unawaited(getListBadge(idCourse));
+    }
+  }
+
+  void _hydrateInstantCache() {
+    final cachedCourse = _courseCache[idCourse];
+    final cachedBadges = _badgeCache[idCourse];
+    final cachedChapters = _chapterCache[_chapterCacheKey()];
+    final cachedUc = _userCourseCache[_chapterCacheKey()];
+
+    if (cachedCourse != null) {
+      courseDetail = cachedCourse;
+    }
+    if (cachedBadges != null) {
+      listBadge = List<BadgeModel>.from(cachedBadges);
+    }
+    if (cachedChapters != null) {
+      listChapter = List<Chapter>.from(cachedChapters);
+      isLoading = false;
+    }
+    if (cachedUc != null) {
+      uc = cachedUc;
+    }
   }
 
   Future<void> updateStatus(index) async {
@@ -52,71 +124,108 @@ class _CourseDetail extends State<CourseDetailScreen> {
     });
   }
 
-  void getUser(int id) async {
+  Future<void> getUser(int id) async {
     user = await UserService.getUserById(id);
   }
 
-  void getCourseDetail() async {
-    pref = await SharedPreferences.getInstance();
-    setState(() {
-      idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
-    });
-    final idUser = pref.getInt('userId');
-    if (idUser != null) {
-      getUser(idUser);
+  Future<void> getCourseDetail() async {
+    if (_isFetchingCourse || idCourse == 0) {
+      return;
     }
-    if (idCourse != 0) {
+
+    _isFetchingCourse = true;
+    try {
       final result = await CourseService.getCourse(idCourse);
+      if (!mounted) return;
       setState(() {
         courseDetail = result;
       });
-      getChapter(idCourse);
-      await getListBadge(idCourse);
+      _courseCache[idCourse] = result;
+    } finally {
+      _isFetchingCourse = false;
     }
   }
 
-  void getUserCourse() async {
-    uc = await UserCourseService.getUserCourse(idUser, idCourse);
+  Future<void> getUserCourse() async {
+    if (_isFetchingUserCourse || idUser == 0 || idCourse == 0) {
+      return;
+    }
+
+    _isFetchingUserCourse = true;
+    try {
+      final fetched = await UserCourseService.getUserCourse(idUser, idCourse);
+      if (!mounted) return;
+      setState(() {
+        uc = fetched;
+      });
+      _userCourseCache[_chapterCacheKey()] = fetched;
+    } finally {
+      _isFetchingUserCourse = false;
+    }
   }
 
   void updateUserCourse() async {
     await UserCourseService.updateUserCourse(uc!.id, uc!);
   }
 
-  void getChapter(int id) async {
-    setState(() {
-      isLoading = true; // Start loading
-    });
+  Future<void> getChapter(int id) async {
+    if (_isFetchingChapters) {
+      return;
+    }
 
-    final result = await CourseService.getChapterByCourse(id);
-    final updatedList = await getStatusChapter(result);
+    _isFetchingChapters = true;
+    if (listChapter.isEmpty && mounted) {
+      setState(() {
+        isLoading = true;
+      });
+    }
 
-    setState(() {
-      listChapter = updatedList;
-      isLoading = false; // Stop loading
-    });
+    try {
+      final result = await CourseService.getChapterByCourse(id);
+      final updatedList = await getStatusChapter(result);
+      if (!mounted) return;
+      setState(() {
+        listChapter = updatedList;
+        isLoading = false;
+      });
+      _chapterCache[_chapterCacheKey()] = List<Chapter>.from(updatedList);
+    } finally {
+      _isFetchingChapters = false;
+    }
   }
 
   Future<void> getListBadge(int courseId) async {
-    listBadge = await BadgeService.getBadgeListCourseByCourseId(courseId);
+    if (_isFetchingBadges) {
+      return;
+    }
+
+    _isFetchingBadges = true;
+    try {
+      final badges = await BadgeService.getBadgeListCourseByCourseId(courseId);
+      if (!mounted) return;
+      setState(() {
+        listBadge = badges;
+      });
+      _badgeCache[courseId] = List<BadgeModel>.from(badges);
+    } finally {
+      _isFetchingBadges = false;
+    }
   }
 
   Future<List<Chapter>> getStatusChapter(List<Chapter> list) async {
-    await Future.forEach(list, (Chapter chapter) async {
-      chapter.status =
-          await UserChapterService.getChapterStatus(idUser, chapter.id);
-    });
-    return list;
-  }
-
-  void getUserFromSharedPreference() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      idUser = prefs.getInt('userId') ?? 0;
-    });
-    if (idUser != 0 && idCourse != 0) {
-      getUserCourse();
+    if (idUser == 0) {
+      return list;
     }
+
+    final statuses = await Future.wait(
+      list.map((chapter) => UserChapterService.getChapterStatus(idUser, chapter.id)),
+    );
+
+    for (int i = 0; i < list.length; i++) {
+      list[i].status = statuses[i];
+    }
+
+    return list;
   }
 
   int idOfBadge(int isCheckpoint) {
@@ -221,14 +330,19 @@ class _CourseDetail extends State<CourseDetailScreen> {
                     : Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: ListView.builder(
-                          itemCount: listChapter.length,
+                          itemCount: listChapter.length + 1,
                           itemBuilder: (context, count) {
+                            if (count == 0) {
+                              return _buildCourseCover();
+                            }
+
+                            final chapterIndex = count - 1;
                             return Padding(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 0, vertical: 0),
-                              child: count <= uc!.currentChapter - 1
-                                  ? _buildCourseItem(count)
-                                  : _buildCourseItemLocked(count),
+                              child: chapterIndex <= (uc?.currentChapter ?? 0) - 1
+                                  ? _buildCourseItem(chapterIndex)
+                                  : _buildCourseItemLocked(chapterIndex),
                             );
                           },
                         ),
@@ -274,6 +388,106 @@ class _CourseDetail extends State<CourseDetailScreen> {
                 ),
               ),
       ],
+    );
+  }
+
+  Widget _buildCourseCover() {
+    final hasRemoteImage = (courseDetail?.image ?? '').trim().isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            SizedBox(
+              height: 220,
+              width: double.infinity,
+              child: hasRemoteImage
+                  ? Image.network(
+                      courseDetail!.image,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'lib/assets/pictures/icon.png',
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      'lib/assets/pictures/icon.png',
+                      fit: BoxFit.cover,
+                    ),
+            ),
+            Container(
+              height: 220,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.15),
+                    Colors.black.withOpacity(0.65),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      courseDetail?.codeCourse ?? 'COURSE',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        fontFamily: 'DIN_Next_Rounded',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    courseDetail?.courseName ?? '-',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'DIN_Next_Rounded',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    courseDetail?.description?.isNotEmpty == true
+                        ? courseDetail!.description!
+                        : 'No description available',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontFamily: 'DIN_Next_Rounded',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

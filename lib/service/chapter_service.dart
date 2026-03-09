@@ -59,10 +59,31 @@ class ChapterService {
     return inFlight;
   }
 
-  static Future<LearningMaterial> getMaterialByChapterId(int id) async {
+  static Future<LearningMaterial> getMaterialByChapterId(
+    int id, {
+    void Function(LearningMaterial freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await ApiCacheService.get(
-          Uri.parse('${GlobalVar.baseUrl}/chapter/$id/materials'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/chapter/$id/materials');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          onRevalidated(
+            LearningMaterial(
+              id: freshResult['id'],
+              chapterId: freshResult['chapterId'],
+              name: freshResult['name'],
+              content: freshResult['content'],
+              createdAt: DateTime.parse(freshResult['createdAt']),
+              updatedAt: DateTime.parse(freshResult['updatedAt']),
+            ),
+          );
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       LearningMaterial chapter = LearningMaterial(
@@ -79,10 +100,52 @@ class ChapterService {
     }
   }
 
-  static Future<Assessment> getAssessmentByChapterId(int id) async {
+  static Future<Assessment> getAssessmentByChapterId(
+    int id, {
+    void Function(Assessment freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await ApiCacheService.get(
-          Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assessments'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assessments');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          final List<dynamic> freshDecodeQuestion = freshResult['questions'] == null
+              ? []
+              : (freshResult['questions'] is String
+                  ? jsonDecode(freshResult['questions'])
+                  : freshResult['questions']);
+          final freshQuestions = freshDecodeQuestion
+              .map((q) => Question(
+                    id: q['id'],
+                    question: q['question'] ?? 'No question text',
+                    option: q['options'] != null ? List<String>.from(q['options']) : [],
+                    correctedAnswer: q['correctedAnswer'] ?? q['answer'] ?? '',
+                    type: q['type'] ?? 'PG',
+                    elo: q['elo'] ?? 1200,
+                  ))
+              .toList();
+
+          final List<String>? freshDecodedAnswers = freshResult['answers'] != null
+              ? List<String>.from(jsonDecode(freshResult['answers']))
+              : null;
+
+          onRevalidated(
+            Assessment(
+              id: freshResult['id'],
+              chapterId: freshResult['chapterId'],
+              instruction: freshResult['instruction'],
+              questions: freshQuestions,
+              answers: freshDecodedAnswers,
+              createdAt: DateTime.parse(freshResult['createdAt']),
+              updatedAt: DateTime.parse(freshResult['updatedAt']),
+            ),
+          );
+        },
+      );
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
@@ -295,10 +358,22 @@ class ChapterService {
     }
   }
 
-  static Future<Assignment> getAssignmentByChapterId(int id) async {
+  static Future<Assignment> getAssignmentByChapterId(
+    int id, {
+    void Function(Assignment freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await ApiCacheService.get(
-          Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assignments'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/chapter/$id/assignments');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          onRevalidated(Assignment.fromJson(freshResult));
+        },
+      );
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {
@@ -313,10 +388,22 @@ class ChapterService {
     }
   }
 
-  static Future<Chapter> getChapterById(int id) async {
+  static Future<Chapter> getChapterById(
+    int id, {
+    void Function(Chapter freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await ApiCacheService.get(
-          Uri.parse('${GlobalVar.baseUrl}/chapter/$id'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/chapter/$id');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          onRevalidated(Chapter.fromJson(freshResult));
+        },
+      );
       final result = jsonDecode(response.body);
 
       if (result.isEmpty) {

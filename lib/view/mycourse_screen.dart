@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/service/course_service.dart';
 import 'package:app/utils/colors.dart';
 import 'package:app/view/course_initial_screen.dart';
@@ -17,17 +19,20 @@ class MycourseScreen extends StatefulWidget {
 }
 
 class _CourseDetail extends State<MycourseScreen> {
+  static final Map<int, List<Course>> _enrolledCache = {};
+
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
   bool _isFocused = false;
   late SharedPreferences pref;
   List<Course> allCourses = [];
   List<Course> filteredCourses = [];
+  bool _isFetchingCourses = false;
 
   @override
   void initState() {
     super.initState();
-    getEnrolledCourse();
+    unawaited(_bootstrap());
     _focusNode.addListener(() {
       setState(() {
         _isFocused = _focusNode.hasFocus;
@@ -38,6 +43,22 @@ class _CourseDetail extends State<MycourseScreen> {
     filteredCourses = List.from(allCourses); // Initially show all courses
   }
 
+  Future<void> _bootstrap() async {
+    pref = await SharedPreferences.getInstance();
+    final id = pref.getInt('userId');
+    if (id == null) return;
+
+    final cached = _enrolledCache[id];
+    if (cached != null && mounted) {
+      setState(() {
+        allCourses = List<Course>.from(cached);
+        filteredCourses = List<Course>.from(cached);
+      });
+    }
+
+    unawaited(getEnrolledCourse());
+  }
+
   @override
   void dispose() {
     _focusNode.dispose();
@@ -45,7 +66,12 @@ class _CourseDetail extends State<MycourseScreen> {
     super.dispose();
   }
 
-  void getEnrolledCourse() async {
+  Future<void> getEnrolledCourse() async {
+    if (_isFetchingCourses) {
+      return;
+    }
+
+    _isFetchingCourses = true;
     try {
       pref = await SharedPreferences.getInstance();
       int? id = pref.getInt('userId');
@@ -58,8 +84,11 @@ class _CourseDetail extends State<MycourseScreen> {
         allCourses = result;
         filteredCourses = result;
       });
+      _enrolledCache[id] = List<Course>.from(result);
     } catch (e) {
       debugPrint("Error fetching courses: $e");
+    } finally {
+      _isFetchingCourses = false;
     }
   }
 
@@ -207,7 +236,7 @@ class _CourseDetail extends State<MycourseScreen> {
   Widget _buildCourseItem(Course course) {
     return GestureDetector(
       onTap: () async {
-        await pref.setInt('lastestSelectedCourse', course.id);
+        unawaited(pref.setInt('lastestSelectedCourse', course.id));
             Navigator.push(
           context,
           MaterialPageRoute(
@@ -227,8 +256,30 @@ class _CourseDetail extends State<MycourseScreen> {
         child:  Column(
           children: [
             course.image != '' ?
-            Image.network(course.image, height: 100, width: double.infinity, fit: BoxFit.cover)
-                : Image.network(url, height: 100, width: double.infinity, fit: BoxFit.cover),
+            Image.network(
+              course.image,
+              height: 100,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Image.asset(
+                'lib/assets/pictures/imk-picture.jpg',
+                height: 100,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            )
+                : Image.network(
+                    url,
+                    height: 100,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Image.asset(
+                      'lib/assets/pictures/imk-picture.jpg',
+                      height: 100,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
             ListTile(
               title: Text(course.codeCourse.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.accentColor, fontFamily: 'DIN_Next_Rounded'),),
               subtitle: Column(

@@ -7,9 +7,24 @@ import '../global_var.dart';
 import '../model/user.dart';
 
 class UserService {
-  static Future<List<Student>> getAllUser() async {
+  static Future<List<Student>> getAllUser({
+    void Function(List<Student> freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/user'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/user');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          final freshUsers = List<Student>.from(
+            freshResult.map((user) => Student.fromJson(user)),
+          );
+          onRevalidated(freshUsers);
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       List<Student> users = List<Student>.from(
@@ -23,9 +38,22 @@ class UserService {
     }
   }
 
-  static Future<Student> getUserById(int id) async {
+  static Future<Student> getUserById(
+    int id, {
+    void Function(Student freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/user/$id'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/user/$id');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          onRevalidated(Student.fromJson(freshResult));
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       Student users = Student.fromJson(result);

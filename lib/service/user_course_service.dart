@@ -7,10 +7,26 @@ import '../model/user_course.dart';
 
 class UserCourseService {
 
-  static Future<UserCourse> getUserCourse(int idUser, int idCourse) async {
+  static Future<UserCourse> getUserCourse(
+    int idUser,
+    int idCourse, {
+    void Function(UserCourse freshData)? onRevalidated,
+  }) async {
     try {
       late UserCourse status;
-      final response = await ApiCacheService.get(Uri.parse('${GlobalVar.baseUrl}/usercourse/$idUser/$idCourse'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/usercourse/$idUser/$idCourse');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          if (freshResult is List && freshResult.isNotEmpty) {
+            onRevalidated(UserCourse.fromJson(freshResult[0]));
+          }
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       print(result);

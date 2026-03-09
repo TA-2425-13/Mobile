@@ -87,7 +87,10 @@ class _QuickAccessScreenState extends State<QuickAccessScreen> {
             return ListTile(
                 leading: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(item.imageUrl),
+                  child: Image.network(
+                    item.imageUrl,
+                    errorBuilder: (context, error, stackTrace) => Image.asset('lib/assets/pictures/icon.png'),
+                  ),
                 ),
                 title: Text(item.name,
                     style: TextStyle(

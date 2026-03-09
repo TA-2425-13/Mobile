@@ -38,33 +38,54 @@ class _ProfileState extends State<ProfileScreen> {
 
   @override
   void initState() {
-    getUserData();
     super.initState();
+    getUserData();
   }
 
   Future<void> getUserData() async {
-    prefs = await SharedPreferences.getInstance();
-    final idUser = prefs.getInt('userId');
-    if (idUser != null) {
+    try {
+      prefs = await SharedPreferences.getInstance();
+      final idUser = prefs.getInt('userId');
+
+      if (idUser == null) {
+        if (!mounted) return;
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
       Student fetchedUser = await UserService.getUserById(idUser);
+      if (!mounted) return;
       setState(() {
         user = fetchedUser;
-        isLoading = false;
       });
-      getUserBadges(idUser);
-      getAllUser();
-      getEnrolledCourse(idUser);
+
+      await Future.wait([
+        getUserBadges(idUser),
+        getAllUser(),
+        getEnrolledCourse(idUser),
+      ]);
+    } catch (e) {
+      // Keep profile screen responsive when network/data fetch fails.
+      debugPrint('Failed to load profile data: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
   List<Student> sortUserbyPoint(List<Student> list) {
-    print(list);
     list.sort((a, b) => b.points!.compareTo(a.points!));
     return list;
   }
 
   Future<void> getAllUser() async {
     final result = await UserService.getAllUser();
+    if (!mounted) return;
     setState(() {
       list = sortUserbyPoint(studentRole(result));
     });
@@ -80,13 +101,23 @@ class _ProfileState extends State<ProfileScreen> {
 
   Future<void> getEnrolledCourse(int userId) async {
     final result = await CourseService.getEnrolledCourse(userId);
+    if (!mounted) return;
     setState(() {
       allCourses = result;
     });
   }
 
   Future<void> getUserBadges(int userId) async {
-    final result = await BadgeService.getUserBadgeListByUserId(userId);
+    final result = await BadgeService.getUserBadgeListByUserId(
+      userId,
+      onRevalidated: (freshBadges) {
+        if (!mounted) return;
+        setState(() {
+          userBadges = freshBadges;
+        });
+      },
+    );
+    if (!mounted) return;
     setState(() {
       userBadges = result;
     });
@@ -110,8 +141,10 @@ class _ProfileState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    var isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
-    return isLoading ? Scaffold(
+    final currentUser = user;
+
+    if (isLoading) {
+      return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           image: DecorationImage(
@@ -138,7 +171,38 @@ class _ProfileState extends State<ProfileScreen> {
             )
         ),
       )
-    ) : Scaffold(
+    );
+    }
+
+    if (currentUser == null) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: GlobalVar.primaryColor,
+          automaticallyImplyLeading: false,
+          title: const Text(
+            'Profile',
+            style: TextStyle(
+              fontFamily: 'DIN_Next_Rounded',
+              color: Colors.white,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Data profil tidak tersedia. Silakan login ulang.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontFamily: 'DIN_Next_Rounded',
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
       appBar: AppBar(
         backgroundColor: GlobalVar.primaryColor,
         // leading: IconButton(
@@ -228,7 +292,13 @@ class _ProfileState extends State<ProfileScreen> {
                                   height: 120,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(100),
-                                    child: user?.image != "" && user?.image != null ? Image.network(user!.image!, fit: BoxFit.cover,)
+                                    child: currentUser.image != "" && currentUser.image != null ? Image.network(
+                                      currentUser.image!,
+                                      fit: BoxFit.cover,
+                                      cacheWidth: 512,
+                                      cacheHeight: 512,
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 100, color: Colors.white),
+                                    )
                                         : Icon(Icons.person, size: 100, color: Colors.white,),
                                   ),
                                 ),
@@ -239,7 +309,7 @@ class _ProfileState extends State<ProfileScreen> {
                                     onTap: () {
                                       Navigator.pushReplacement(
                                         context,
-                                        MaterialPageRoute(builder: (context) => UpdateProfile(user: user!,)),
+                                        MaterialPageRoute(builder: (context) => UpdateProfile(user: currentUser)),
                                       );
                                     },
                                     child: Container(
@@ -257,12 +327,12 @@ class _ProfileState extends State<ProfileScreen> {
                             ],
                           ),
                           const SizedBox(height: 10),
-                          Text(user!.name,
+                            Text(currentUser.name,
                               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                   fontFamily: 'DIN_Next_Rounded',
                                   color: Colors.white
                               )),
-                          Text(user!.studentId ?? '',
+                            Text(currentUser.studentId ?? '',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   fontFamily: 'DIN_Next_Rounded',
                                   color: GlobalVar.accentColor
@@ -275,7 +345,7 @@ class _ProfileState extends State<ProfileScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              user!.eloTitle ?? 'Beginner',
+                              currentUser.eloTitle ?? 'Beginner',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 fontFamily: 'DIN_Next_Rounded',
                                 color: Colors.black87,
@@ -292,20 +362,69 @@ class _ProfileState extends State<ProfileScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(10.0),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              spacing: 16,
+                            child: Column(
                               children: [
-                                _buildInfoColumn(LineAwesomeIcons.medal_solid,
-                                    'Lencana', '${userBadges?.length}', GlobalVar.secondaryColor),
-                                _buildInfoColumn(LineAwesomeIcons.user_check_solid,
-                                    'Course', '${allCourses != null ? allCourses?.length : '0'}', GlobalVar.secondaryColor),
-                                _buildInfoColumn(LineAwesomeIcons.trophy_solid,
-                                    'Peringkat', '$rank / ${list.length}', GlobalVar.secondaryColor),
-                                _buildInfoColumn(LineAwesomeIcons.gem_solid,
-                                    'Poin', '${user?.points ?? 0}', GlobalVar.secondaryColor),
-                                _buildInfoColumn(LineAwesomeIcons.fire_solid,
-                                    'ELO', '${user?.elo ?? 750}', GlobalVar.secondaryColor)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Center(
+                                        child: _buildInfoColumn(
+                                          LineAwesomeIcons.medal_solid,
+                                          'Lencana',
+                                          '${userBadges?.length}',
+                                          GlobalVar.secondaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Center(
+                                        child: _buildInfoColumn(
+                                          LineAwesomeIcons.user_check_solid,
+                                          'Course',
+                                          '${allCourses != null ? allCourses?.length : '0'}',
+                                          GlobalVar.secondaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Center(
+                                        child: _buildInfoColumn(
+                                          LineAwesomeIcons.trophy_solid,
+                                          'Peringkat',
+                                          '$rank / ${list.length}',
+                                          GlobalVar.secondaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(child: SizedBox()),
+                                    Expanded(
+                                      child: Center(
+                                        child: _buildInfoColumn(
+                                          LineAwesomeIcons.gem_solid,
+                                          'Poin',
+                                          '${currentUser.points ?? 0}',
+                                          GlobalVar.secondaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Center(
+                                        child: _buildInfoColumn(
+                                          LineAwesomeIcons.fire_solid,
+                                          'ELO',
+                                          '${currentUser.elo ?? 750}',
+                                          GlobalVar.secondaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(child: SizedBox()),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
@@ -363,7 +482,13 @@ class _ProfileState extends State<ProfileScreen> {
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
                                       child: userBadges?[index].badge.image != null && userBadges?[index].badge.image != '' ?
-                                      Image.network(userBadges![index].badge.image!, fit: BoxFit.cover) : Image.asset('lib/assets/pictures/icon.png', fit: BoxFit.cover)
+                                      Image.network(
+                                        userBadges![index].badge.image!,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: 256,
+                                        cacheHeight: 256,
+                                        errorBuilder: (context, error, stackTrace) => Image.asset('lib/assets/pictures/icon.png', fit: BoxFit.cover),
+                                      ) : Image.asset('lib/assets/pictures/icon.png', fit: BoxFit.cover)
                                     ),
                                   ),
                                 );
@@ -384,7 +509,7 @@ class _ProfileState extends State<ProfileScreen> {
                         onPress: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => TradeScreen(user: user!,)),
+                            MaterialPageRoute(builder: (context) => TradeScreen(user: currentUser)),
                           );
                         },
                       ),
@@ -394,7 +519,7 @@ class _ProfileState extends State<ProfileScreen> {
                         onPress: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => UpdateProfile(user: user!,)),
+                            MaterialPageRoute(builder: (context) => UpdateProfile(user: currentUser)),
                           );
                         },
                       ),
@@ -468,10 +593,6 @@ class _ProfileState extends State<ProfileScreen> {
   void _showBadgeDetails(BuildContext context, BadgeModel badge) async {
     Course resultCourse = await getCourseById(badge.courseId);
     Chapter resultChapter = await getChapterById(badge.chapterId);
-    setState(() {
-      course = resultCourse;
-      chapter = resultChapter;
-    });
 
     if (context.mounted) {
       showDialog(
@@ -486,7 +607,13 @@ class _ProfileState extends State<ProfileScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: badge.image != null  ?
-                  Image.network(badge.image!, fit: BoxFit.cover) : Image.asset('lib/assets/pictures/icon.png', fit: BoxFit.cover),
+                  Image.network(
+                    badge.image!,
+                    fit: BoxFit.cover,
+                    cacheWidth: 512,
+                    cacheHeight: 512,
+                    errorBuilder: (context, error, stackTrace) => Image.asset('lib/assets/pictures/icon.png', fit: BoxFit.cover),
+                  ) : Image.asset('lib/assets/pictures/icon.png', fit: BoxFit.cover),
                 ),
                 SizedBox(height: 16),
                 Text(
@@ -504,7 +631,7 @@ class _ProfileState extends State<ProfileScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Badge ini diperoleh karena telah berhasil menyelesaikan ${course!.courseName} sampai pada chapter ${chapter!.name}',
+                  'Badge ini diperoleh karena telah berhasil menyelesaikan ${resultCourse.courseName} sampai pada chapter ${resultChapter.name}',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                 ),

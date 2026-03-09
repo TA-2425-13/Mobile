@@ -65,7 +65,12 @@ class _CongratulationsScreenState extends State<CongratulationsScreen> {
                 children: [
                   idBadge != 0 ?
                     badge?.image != null && badge?.image != "" ?
-                      Image.network(badge!.image!, height: 100, width: 100,) : Image.asset('lib/assets/pixels/check.png', height: 100)
+                      Image.network(
+                        badge!.image!,
+                        height: 100,
+                        width: 100,
+                        errorBuilder: (context, error, stackTrace) => Image.asset('lib/assets/pixels/check.png', height: 100),
+                      ) : Image.asset('lib/assets/pixels/check.png', height: 100)
                   : Image.asset('lib/assets/pixels/star.png', height: 100),
                   const SizedBox(height: 20),
                   Text(

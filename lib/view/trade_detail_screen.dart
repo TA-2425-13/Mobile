@@ -48,7 +48,15 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
       int? id = pref.getInt('userId');
       if (id == null) return;
 
-      final result = await BadgeService.getUserBadgeListByUserId(id);
+      final result = await BadgeService.getUserBadgeListByUserId(
+        id,
+        onRevalidated: (freshBadges) {
+          if (!mounted) return;
+          setState(() {
+            userBadges = freshBadges;
+          });
+        },
+      );
       if (!mounted) return;
 
       setState(() {
@@ -65,7 +73,15 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
       int? id = pref.getInt('userId');
       if (id == null) return;
 
-      final result = await BadgeService.getUserBadgeListWithStatusByUserId(id);
+      final result = await BadgeService.getUserBadgeListWithStatusByUserId(
+        id,
+        onRevalidated: (freshBadges) {
+          if (!mounted) return;
+          setState(() {
+            userBadgesWithStatus = freshBadges;
+          });
+        },
+      );
       if (!mounted) return;
 
       setState(() {
@@ -230,7 +246,10 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                 ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: widget.trade.image.toLowerCase().startsWith('http')
-                        ? Image.network(widget.trade.image)
+                    ? Image.network(
+                      widget.trade.image,
+                      errorBuilder: (context, error, stackTrace) => Image.asset('lib/assets/pictures/icon.png'),
+                      )
                         : Image.asset(widget.trade.image)
                 ),
                 SizedBox(height: 16),
@@ -367,7 +386,16 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: widget.trade.image.toLowerCase().startsWith('http')
-                    ? Image.network(widget.trade.image, height: 180, fit: BoxFit.cover)
+                    ? Image.network(
+                        widget.trade.image,
+                        height: 180,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Image.asset(
+                          'lib/assets/pictures/icon.png',
+                          height: 180,
+                          fit: BoxFit.cover,
+                        ),
+                      )
                     : Image.asset(widget.trade.image, height: 180, fit: BoxFit.cover),
               ),
               const SizedBox(height: 16),

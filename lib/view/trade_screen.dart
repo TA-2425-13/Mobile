@@ -116,7 +116,10 @@ class _TradeScreenState extends State<TradeScreen> {
                   leading: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: trade.image.toLowerCase().startsWith('http')
-                          ? Image.network(trade.image)
+                        ? Image.network(
+                          trade.image,
+                          errorBuilder: (context, error, stackTrace) => Image.asset('lib/assets/pictures/icon.png'),
+                        )
                           : Image.asset(trade.image)
                   ),
                   title: Text(
