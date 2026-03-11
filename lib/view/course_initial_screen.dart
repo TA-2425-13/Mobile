@@ -159,7 +159,7 @@ class _CourseInitialScreenState extends State<CourseInitialScreen> {
     }
   }
 
-  void getCourseDetail() async {
+  Future<void> getCourseDetail() async {
     if (_isFetchingCourse) {
       return;
     }
@@ -198,7 +198,7 @@ class _CourseInitialScreenState extends State<CourseInitialScreen> {
     }
   }
 
-  void getBadges() async {
+  Future<void> getBadges() async {
     if (_isFetchingBadges) {
       return;
     }
@@ -235,7 +235,7 @@ class _CourseInitialScreenState extends State<CourseInitialScreen> {
     }
   }
 
-  void getChapters() async {
+  Future<void> getChapters() async {
     if (_isFetchingChapters) {
       return;
     }

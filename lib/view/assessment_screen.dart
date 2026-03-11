@@ -5,8 +5,10 @@ import 'package:app/model/assessment.dart';
 import 'package:app/model/assessment_attempt.dart';
 import 'package:app/model/chapter_status.dart';
 import 'package:app/model/user.dart';
+import 'package:app/model/user_course.dart';
 import 'package:app/service/chapter_service.dart';
 import 'package:app/service/user_chapter_service.dart';
+import 'package:app/service/user_course_service.dart';
 import 'package:app/utils/colors.dart';
 
 class AssessmentScreen extends StatefulWidget {
@@ -15,6 +17,8 @@ class AssessmentScreen extends StatefulWidget {
   final int? courseId;
   final int? level;
   final String? chapterName;
+  final UserCourse? uc;
+  final int? chLength;
   final Function(bool) updateMaterialLocked;
   final Function(ChapterStatus) updateStatus;
   final Function(bool) updateAssessmentStarted;
@@ -27,6 +31,8 @@ class AssessmentScreen extends StatefulWidget {
     this.courseId,
     this.level,
     this.chapterName,
+    this.uc,
+    this.chLength,
     required this.updateMaterialLocked,
     required this.updateStatus,
     required this.updateAssessmentStarted,
@@ -63,6 +69,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
   int _grade = 0;
   int _pointsEarned = 0;
+  int _eloDeltaFinal = 0;
   int _correctAnswer = 0;
   String? _aiFeedback;
   String? _newDifficultyLabel;
@@ -81,7 +88,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     status = widget.status;
     user = widget.user;
     _grade = status.assessmentGrade;
-    _pointsEarned = status.assessmentEloDelta;
+    _pointsEarned = status.assessmentEloDelta; // Use existing field for both or keep 0
+    _eloDeltaFinal = status.assessmentEloDelta;
     _bootstrapCurrentAttempt();
   }
 
@@ -327,6 +335,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     setState(() {
       _grade = (result['grade'] as int?) ?? 0;
       _pointsEarned = (result['pointsEarned'] as int?) ?? 0;
+      _eloDeltaFinal = (result['eloDelta'] as int?) ?? _pointsEarned;
       _correctAnswer = (result['correctAnswers'] as int?) ?? 0;
       _aiFeedback = result['aiFeedback']?.toString();
       _newDifficultyLabel = result['newDifficulty']?.toString();
@@ -335,10 +344,18 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       _attemptId = null;
       status.assessmentDone = true;
       status.assessmentGrade = _grade;
-      status.assessmentEloDelta = _pointsEarned;
+      status.assessmentEloDelta = _eloDeltaFinal;
       status.assessmentAnswer =
           _servedQuestions.map((q) => q.selectedAnswer).toList();
       user?.points = (user?.points ?? 0) + _pointsEarned;
+      
+      if (widget.uc != null && widget.level != null && widget.chLength != null) {
+        if (widget.level == widget.uc!.currentChapter) {
+          widget.uc!.currentChapter++;
+          widget.uc!.progress = (((widget.uc!.currentChapter - 1) / widget.chLength!) * 100).toInt();
+          UserCourseService.updateUserCourse(widget.uc!.id, widget.uc!);
+        }
+      }
     });
 
     widget.updateAssessmentFinished(true);
@@ -733,13 +750,13 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                             fontFamily: 'DIN_Next_Rounded')),
                     const Divider(color: Colors.white54, height: 24),
                     Text(
-                        'Elo Delta (Perubahan Elo Course): ${_pointsEarned > 0 ? '+' : ''}$_pointsEarned',
+                        'Elo Delta (Perubahan Elo Course): ${_eloDeltaFinal > 0 ? '+' : ''}$_eloDeltaFinal',
                         style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'DIN_Next_Rounded')),
                     Text(
-                        'Points Earned (Gamifikasi): ${_pointsEarned > 0 ? _pointsEarned : 0}',
+                        'Points Earned (Gamifikasi): ${_pointsEarned > 0 ? '+' : ''}$_pointsEarned',
                         style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

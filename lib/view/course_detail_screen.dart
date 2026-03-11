@@ -600,8 +600,7 @@ class _CourseDetail extends State<CourseDetailScreen> {
                   child: Icon(LineAwesomeIcons.medal_solid,
                       size: 50,
                       color: chapter.status!.materialDone &&
-                              chapter.status!.assessmentDone &&
-                              chapter.status!.assignmentDone
+                              chapter.status!.assessmentDone
                           ? Colors.tealAccent
                           : Colors.white54))
               : listChapter[index].isCheckpoint == 2
@@ -611,8 +610,7 @@ class _CourseDetail extends State<CourseDetailScreen> {
                       child: Icon(LineAwesomeIcons.medal_solid,
                           size: 50,
                           color: chapter.status!.materialDone &&
-                                  chapter.status!.assessmentDone &&
-                                  chapter.status!.assignmentDone
+                                  chapter.status!.assessmentDone
                               ? Colors.blueAccent
                               : Colors.white54))
                   : listChapter[index].isCheckpoint == 3
@@ -622,8 +620,7 @@ class _CourseDetail extends State<CourseDetailScreen> {
                           child: Icon(LineAwesomeIcons.medal_solid,
                               size: 50,
                               color: chapter.status!.materialDone &&
-                                      chapter.status!.assessmentDone &&
-                                      chapter.status!.assignmentDone
+                                      chapter.status!.assessmentDone
                                   ? Colors.redAccent
                                   : Colors.white54))
                       : SizedBox(),

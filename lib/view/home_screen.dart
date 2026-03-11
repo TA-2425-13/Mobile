@@ -137,7 +137,7 @@ class _HomeState extends State<Homescreen> {
     return list.where((user) => user.role == 'STUDENT').toList();
   }
 
-  void getAllUser() async {
+  Future<void> getAllUser() async {
     try {
       final result = await UserService.getAllUser().timeout(Duration(seconds: 10));
       setState(() {

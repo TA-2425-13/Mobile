@@ -152,6 +152,8 @@ class _ChapterScreenState extends State<Chapterscreen>
                       courseId: widget.uc.courseId,
                       level: widget.level,
                       chapterName: widget.chapterName,
+                      uc: widget.uc,
+                      chLength: widget.chLength,
                       updateMaterialLocked: updateMaterialLocked,
                       updateStatus: updateStatus,
                       updateAssessmentFinished: updateAssessmentFinished,

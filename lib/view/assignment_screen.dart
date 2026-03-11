@@ -379,14 +379,6 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                           if(!status.assignmentDone && !complete){
                             user?.points = user!.points! + calculatePoint(difference.inMinutes);
                           }
-                          print(user?.points);
-                          print("awoo");
-
-                          if (widget.level == uc.currentChapter) {
-                            uc.currentChapter++;
-                            uc.progress = (((uc.currentChapter - 1) / chLength) * 100).toInt();
-                          }
-
                           if (idBadge != 0) {
                             createUserBadge(user!.id, idBadge);
                             user?.badges = user!.badges! + 1;
