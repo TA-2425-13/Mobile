@@ -97,18 +97,7 @@ class CourseService {
           }
           final freshResult = jsonDecode(freshResponse.body);
           final freshChapters = List<Chapter>.from(
-            freshResult.map(
-              (item) => Chapter(
-                id: item['id'],
-                name: item['name'],
-                description: item['description'],
-                level: item['level'],
-                courseId: item['courseId'],
-                isCheckpoint: item['isCheckpoint'],
-                createdAt: DateTime.parse(item['createdAt']),
-                updatedAt: DateTime.parse(item['updatedAt']),
-              ),
-            ),
+            freshResult.map((item) => Chapter.fromJson(item)),
           );
           onRevalidated(freshChapters);
         },
@@ -116,21 +105,24 @@ class CourseService {
       final body = response.body;
       final result = jsonDecode(body);
       List<Chapter> chapter = List.from(
-        result.map(
-            (result) => Chapter(
-                id: result['id'],
-                name: result['name'],
-                description: result['description'],
-                level: result['level'],
-                courseId: result['courseId'],
-                isCheckpoint: result['isCheckpoint'],
-                createdAt: DateTime.parse(result['createdAt']),
-                updatedAt: DateTime.parse(result['updatedAt']),
-            )
-        )
+        result.map((result) => Chapter.fromJson(result))
       );
       return chapter;
     } catch(e){
+      throw Exception(e.toString());
+    }
+  }
+
+  static Future<List<Chapter>> getChapterByCourseForUser(int courseId, int userId) async {
+    try {
+      final uri = Uri.parse('${GlobalVar.baseUrl}/course/$courseId/chapters/user/$userId');
+      final response = await ApiCacheService.get(uri);
+      final result = jsonDecode(response.body);
+
+      return List<Chapter>.from(
+        result.map((item) => Chapter.fromJson(item)),
+      );
+    } catch (e) {
       throw Exception(e.toString());
     }
   }

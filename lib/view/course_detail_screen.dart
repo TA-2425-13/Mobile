@@ -117,8 +117,21 @@ class _CourseDetail extends State<CourseDetailScreen> {
   }
 
   Future<void> updateStatus(index) async {
+    final chapter = listChapter[index];
+    final status = chapter.status!;
+
+    if (status.id <= 0) {
+      final persistedStatus =
+        await UserChapterService.getChapterStatus(idUser, chapter.id);
+      status.id = persistedStatus.id;
+      status.userId = persistedStatus.userId;
+      status.chapterId = persistedStatus.chapterId;
+      status.createdAt = persistedStatus.createdAt;
+      status.updatedAt = persistedStatus.updatedAt;
+    }
+
     final result = await UserChapterService.updateChapterStatus(
-        listChapter[index].status!.id, listChapter[index].status!);
+      status.id, status);
     setState(() {
       listChapter[index].status = result;
     });
@@ -181,8 +194,20 @@ class _CourseDetail extends State<CourseDetailScreen> {
     }
 
     try {
-      final result = await CourseService.getChapterByCourse(id);
-      final updatedList = await getStatusChapter(result);
+      List<Chapter> result;
+
+      if (idUser != 0) {
+        try {
+          result = await CourseService.getChapterByCourseForUser(id, idUser);
+        } catch (_) {
+          final fallback = await CourseService.getChapterByCourse(id);
+          result = await getStatusChapter(fallback);
+        }
+      } else {
+        result = await CourseService.getChapterByCourse(id);
+      }
+
+      final updatedList = _ensureChapterStatuses(result);
       if (!mounted) return;
       setState(() {
         listChapter = updatedList;
@@ -214,7 +239,7 @@ class _CourseDetail extends State<CourseDetailScreen> {
 
   Future<List<Chapter>> getStatusChapter(List<Chapter> list) async {
     if (idUser == 0) {
-      return list;
+      return _ensureChapterStatuses(list);
     }
 
     final statuses = await Future.wait(
@@ -226,6 +251,37 @@ class _CourseDetail extends State<CourseDetailScreen> {
     }
 
     return list;
+  }
+
+  List<Chapter> _ensureChapterStatuses(List<Chapter> chapters) {
+    return chapters.map((chapter) {
+      chapter.status ??= _buildDefaultChapterStatus(chapter.id);
+      return chapter;
+    }).toList();
+  }
+
+  ChapterStatus _buildDefaultChapterStatus(int chapterId) {
+    final now = DateTime.now();
+    return ChapterStatus(
+      id: 0,
+      userId: idUser,
+      chapterId: chapterId,
+      isCompleted: false,
+      isStarted: false,
+      materialDone: false,
+      assessmentDone: false,
+      assignmentDone: false,
+      assessmentAnswer: const [],
+      assessmentGrade: 0,
+      assessmentEloDelta: 0,
+      submission: '',
+      timeStarted: now,
+      timeFinished: now,
+      assignmentScore: 0,
+      assignmentFeedback: '',
+      createdAt: now,
+      updatedAt: now,
+    );
   }
 
   int idOfBadge(int isCheckpoint) {

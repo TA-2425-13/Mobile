@@ -33,6 +33,9 @@ class Chapter {
       isCheckpoint: json['isCheckpoint'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
+      status: json['status'] != null
+          ? ChapterStatus.fromJson(json['status'])
+          : null,
     );
   }
 
