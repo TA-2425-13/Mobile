@@ -26,19 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    emailController.text = 'obenhard';
-    passwordController.text = 'mahasiswa';
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        login();
-      }
-    });
-  }
-
   void login() async {
     if (isLoading) return;
 

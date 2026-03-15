@@ -363,17 +363,13 @@ class _UpdateProfileState extends State<UpdateProfile> {
                           ),
                           ElevatedButton(
                             onPressed: () async{
-                              final preservedMainTutorial =
-                                prefs.getBool('hasSeenMainTutorial') ?? false;
-                              final preservedProfileEloTutorial =
-                                prefs.getBool('profileEloTutorialDone') ?? false;
-                              final preservedFirstLaunch =
-                                prefs.getBool('firstLaunch') ?? false;
-
-                              await prefs.clear();
-                              await prefs.setBool('hasSeenMainTutorial', preservedMainTutorial);
-                              await prefs.setBool('profileEloTutorialDone', preservedProfileEloTutorial);
-                              await prefs.setBool('firstLaunch', preservedFirstLaunch);
+                              await prefs.remove('userId');
+                              await prefs.remove('name');
+                              await prefs.remove('role');
+                              await prefs.remove('token');
+                              await prefs.remove('lastestSelectedCourse');
+                              await prefs.remove('latestSelectedCourse');
+                              await prefs.remove('getCourseDetail');
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(

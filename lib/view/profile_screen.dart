@@ -24,12 +24,14 @@ class ProfileScreen extends StatefulWidget {
   final bool isActive;
   final bool isMainTutorialActive;
   final int tutorialReplayNonce;
+  final VoidCallback? onSubTutorialCompleted;
 
   const ProfileScreen({
     super.key,
     this.isActive = false,
     this.isMainTutorialActive = false,
     this.tutorialReplayNonce = 0,
+    this.onSubTutorialCompleted,
   });
 
   @override
@@ -37,9 +39,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileState extends State<ProfileScreen> {
-  static const String _profileEloTutorialDoneKey = 'profileEloTutorialDone';
-  static const String _mainTutorialKey = 'hasSeenMainTutorial';
-  static const String _firstLaunchKey = 'firstLaunch';
+  static const String _profileEloTutorialDoneKeyBase = 'profileEloTutorialDone';
 
   late SharedPreferences prefs;
   Student? user;
@@ -185,7 +185,7 @@ class _ProfileState extends State<ProfileScreen> {
   }
 
   Future<void> _prepareProfileEloTutorial() async {
-    final tutorialDone = prefs.getBool(_profileEloTutorialDoneKey) ?? false;
+    final tutorialDone = prefs.getBool(_profileEloTutorialKeyForCurrentUser()) ?? false;
     if (!mounted) return;
 
     setState(() {
@@ -223,12 +223,24 @@ class _ProfileState extends State<ProfileScreen> {
   }
 
   Future<void> _completeEloSubTutorial() async {
-    await prefs.setBool(_profileEloTutorialDoneKey, true);
+    await prefs.setBool(_profileEloTutorialKeyForCurrentUser(), true);
     if (!mounted) return;
     setState(() {
       _isEloSubTutorialDone = true;
       _isEloSubTutorialActive = false;
     });
+
+    if (widget.onSubTutorialCompleted != null) {
+      widget.onSubTutorialCompleted!();
+    }
+  }
+
+  String _profileEloTutorialKeyForCurrentUser() {
+    final id = user?.id ?? prefs.getInt('userId');
+    if (id == null) {
+      return _profileEloTutorialDoneKeyBase;
+    }
+    return '${_profileEloTutorialDoneKeyBase}_$id';
   }
 
   List<Student> studentRole(List<Student> list) {
@@ -244,15 +256,13 @@ class _ProfileState extends State<ProfileScreen> {
   }
 
   Future<void> logout() async {
-    final preservedMainTutorial = prefs.getBool(_mainTutorialKey) ?? false;
-    final preservedProfileEloTutorial =
-        prefs.getBool(_profileEloTutorialDoneKey) ?? false;
-    final preservedFirstLaunch = prefs.getBool(_firstLaunchKey) ?? false;
-
-    await prefs.clear();
-    await prefs.setBool(_mainTutorialKey, preservedMainTutorial);
-    await prefs.setBool(_profileEloTutorialDoneKey, preservedProfileEloTutorial);
-    await prefs.setBool(_firstLaunchKey, preservedFirstLaunch);
+    await prefs.remove('userId');
+    await prefs.remove('name');
+    await prefs.remove('role');
+    await prefs.remove('token');
+    await prefs.remove('lastestSelectedCourse');
+    await prefs.remove('latestSelectedCourse');
+    await prefs.remove('getCourseDetail');
   }
 
   @override

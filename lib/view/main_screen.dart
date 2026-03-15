@@ -21,8 +21,8 @@ class Mainscreen extends StatefulWidget {
 }
 
 class _MainState extends State<Mainscreen> {
-  static const String _mainTutorialKey = 'hasSeenMainTutorial';
-  static const String _profileEloTutorialDoneKey = 'profileEloTutorialDone';
+  static const String _mainTutorialKeyBase = 'hasSeenMainTutorial';
+  static const String _profileEloTutorialDoneKeyBase = 'profileEloTutorialDone';
   static const String _selectedCourseLegacyKey = 'getCourseDetail';
   static const String _selectedCourseKey = 'lastestSelectedCourse';
   static const String _selectedCourseAltKey = 'latestSelectedCourse';
@@ -96,8 +96,24 @@ class _MainState extends State<Mainscreen> {
     _maybeStartMainTutorial();
   }
 
+  String _mainTutorialKeyForCurrentUser() {
+    final userId = pref.getInt('userId');
+    if (userId == null) {
+      return _mainTutorialKeyBase;
+    }
+    return '${_mainTutorialKeyBase}_$userId';
+  }
+
+  String _profileEloTutorialKeyForCurrentUser() {
+    final userId = pref.getInt('userId');
+    if (userId == null) {
+      return _profileEloTutorialDoneKeyBase;
+    }
+    return '${_profileEloTutorialDoneKeyBase}_$userId';
+  }
+
   Future<void> _maybeStartMainTutorial() async {
-    final hasSeenTutorial = pref.getBool(_mainTutorialKey) ?? false;
+    final hasSeenTutorial = pref.getBool(_mainTutorialKeyForCurrentUser()) ?? false;
     if (hasSeenTutorial || !mounted) {
       return;
     }
@@ -108,7 +124,7 @@ class _MainState extends State<Mainscreen> {
   }
 
   Future<void> _finishTutorial() async {
-    await pref.setBool(_mainTutorialKey, true);
+    await pref.setBool(_mainTutorialKeyForCurrentUser(), true);
     if (!mounted) return;
     setState(() {
       _isTutorialActive = false;
@@ -116,8 +132,8 @@ class _MainState extends State<Mainscreen> {
   }
 
   Future<void> _restartTutorialFromHome() async {
-    await pref.setBool(_mainTutorialKey, false);
-    await pref.setBool(_profileEloTutorialDoneKey, false);
+    await pref.setBool(_mainTutorialKeyForCurrentUser(), false);
+    await pref.setBool(_profileEloTutorialKeyForCurrentUser(), false);
     if (!mounted) return;
 
     setState(() {
@@ -128,6 +144,91 @@ class _MainState extends State<Mainscreen> {
     });
 
     _showTutorialDialogForStep(0);
+  }
+
+  void _onProfileEloTutorialCompleted() {
+    if (!mounted) return;
+
+    setState(() {
+      navIndex = 0;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'welcome-learning-dialog',
+        barrierColor: Colors.black.withOpacity(0.1),
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return SafeArea(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 14,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.celebration,
+                            color: Color(0xFF441F7F), size: 20),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Tutorial selesai. Selamat belajar dan semangat level up!',
+                            style: TextStyle(
+                              fontFamily: 'DIN_Next_Rounded',
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text(
+                            'Oke',
+                            style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          final curve = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+          return FadeTransition(
+            opacity: curve,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.1),
+                end: Offset.zero,
+              ).animate(curve),
+              child: child,
+            ),
+          );
+        },
+      );
+    });
   }
 
   void _showTutorialDialogForStep(int stepIndex) {
@@ -190,6 +291,7 @@ class _MainState extends State<Mainscreen> {
           isActive: navIndex == 4,
           isMainTutorialActive: _isTutorialActive,
           tutorialReplayNonce: _profileTutorialReplayNonce,
+          onSubTutorialCompleted: _onProfileEloTutorialCompleted,
         );
       default:
         return Homescreen(
