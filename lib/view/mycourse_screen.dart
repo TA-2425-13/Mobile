@@ -77,7 +77,17 @@ class _CourseDetail extends State<MycourseScreen> {
       int? id = pref.getInt('userId');
       if (id == null) return;
 
-      final result = await CourseService.getEnrolledCourse(id);
+      final result = await CourseService.getEnrolledCourse(
+        id,
+        onRevalidated: (freshData) {
+          if (!mounted) return;
+          setState(() {
+            allCourses = freshData;
+            filteredCourses = freshData;
+          });
+          _enrolledCache[id] = List<Course>.from(freshData);
+        },
+      );
       if (!mounted) return;
 
       setState(() {

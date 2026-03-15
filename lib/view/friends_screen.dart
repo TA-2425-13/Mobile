@@ -30,6 +30,7 @@ class _FriendsScreen extends State<FriendsScreen> {
 
   void getAllUser() async {
     final result = await UserService.getAllUser();
+    if (!mounted) return;
     setState(() {
       user = sortUserbyPoint(studentRole(result));
     });

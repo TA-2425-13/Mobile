@@ -19,13 +19,26 @@ import '../utils/colors.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final bool isActive;
+  final bool isMainTutorialActive;
+  final int tutorialReplayNonce;
+
+  const ProfileScreen({
+    super.key,
+    this.isActive = false,
+    this.isMainTutorialActive = false,
+    this.tutorialReplayNonce = 0,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileState();
 }
 
 class _ProfileState extends State<ProfileScreen> {
+  static const String _profileEloTutorialDoneKey = 'profileEloTutorialDone';
+  static const String _mainTutorialKey = 'hasSeenMainTutorial';
+  static const String _firstLaunchKey = 'firstLaunch';
+
   late SharedPreferences prefs;
   Student? user;
   bool isLoading = true;
@@ -35,11 +48,45 @@ class _ProfileState extends State<ProfileScreen> {
   Course? course;
   Chapter? chapter;
   List<Course>? allCourses;
+  bool _isEloSubTutorialDone = false;
+  bool _isEloSubTutorialActive = false;
+  int _eloTutorialStep = 0;
+  final GlobalKey _eloHighlightKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
+
+  final List<String> _eloTutorialSteps = const [
+    'Ini adalah ELO kamu. Angka ini jadi acuan sistem baru untuk mengatur tingkat kesulitan soal secara adaptif.',
+    'Jika performa assessment kamu bagus, ELO cenderung naik dan soal berikutnya lebih menantang. Jika performa turun, sistem menyesuaikan agar ritme belajar tetap pas. ELO juga dipakai untuk progression badge.',
+  ];
 
   @override
   void initState() {
     super.initState();
     getUserData();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.tutorialReplayNonce != oldWidget.tutorialReplayNonce) {
+      setState(() {
+        _isEloSubTutorialDone = false;
+        _isEloSubTutorialActive = false;
+        _eloTutorialStep = 0;
+      });
+    }
+
+    if ((widget.isActive && !oldWidget.isActive) ||
+        (widget.isActive && oldWidget.isMainTutorialActive && !widget.isMainTutorialActive)) {
+      _maybeStartEloSubTutorial();
+    }
   }
 
   Future<void> getUserData() async {
@@ -66,6 +113,9 @@ class _ProfileState extends State<ProfileScreen> {
         getAllUser(),
         getEnrolledCourse(idUser),
       ]);
+
+      await _prepareProfileEloTutorial();
+      _maybeStartEloSubTutorial();
     } catch (e) {
       // Keep profile screen responsive when network/data fetch fails.
       debugPrint('Failed to load profile data: $e');
@@ -123,6 +173,53 @@ class _ProfileState extends State<ProfileScreen> {
     });
   }
 
+  Future<void> _prepareProfileEloTutorial() async {
+    final tutorialDone = prefs.getBool(_profileEloTutorialDoneKey) ?? false;
+    if (!mounted) return;
+
+    setState(() {
+      _isEloSubTutorialDone = tutorialDone;
+    });
+
+  }
+
+  void _maybeStartEloSubTutorial() {
+    if (!mounted) return;
+    if (isLoading || user == null) return;
+    if (!widget.isActive || widget.isMainTutorialActive) return;
+    if (_isEloSubTutorialDone || _isEloSubTutorialActive) return;
+
+    setState(() {
+      _isEloSubTutorialActive = true;
+      _eloTutorialStep = 0;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureEloHighlightVisible();
+    });
+  }
+
+  Future<void> _ensureEloHighlightVisible() async {
+    final targetContext = _eloHighlightKey.currentContext;
+    if (targetContext == null || !mounted) return;
+
+    await Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      alignment: 0.18,
+    );
+  }
+
+  Future<void> _completeEloSubTutorial() async {
+    await prefs.setBool(_profileEloTutorialDoneKey, true);
+    if (!mounted) return;
+    setState(() {
+      _isEloSubTutorialDone = true;
+      _isEloSubTutorialActive = false;
+    });
+  }
+
   List<Student> studentRole(List<Student> list) {
     return list.where((user) => user.role == 'STUDENT').toList();
   }
@@ -135,8 +232,16 @@ class _ProfileState extends State<ProfileScreen> {
     return ChapterService.getChapterById(id);
   }
 
-  void logout() {
-    prefs.clear();
+  Future<void> logout() async {
+    final preservedMainTutorial = prefs.getBool(_mainTutorialKey) ?? false;
+    final preservedProfileEloTutorial =
+        prefs.getBool(_profileEloTutorialDoneKey) ?? false;
+    final preservedFirstLaunch = prefs.getBool(_firstLaunchKey) ?? false;
+
+    await prefs.clear();
+    await prefs.setBool(_mainTutorialKey, preservedMainTutorial);
+    await prefs.setBool(_profileEloTutorialDoneKey, preservedProfileEloTutorial);
+    await prefs.setBool(_firstLaunchKey, preservedFirstLaunch);
   }
 
   @override
@@ -279,6 +384,7 @@ class _ProfileState extends State<ProfileScreen> {
                   ),
                 ),
                 SingleChildScrollView(
+                  controller: _scrollController,
                   child: Column(
                     children: [
                       Container(
@@ -414,12 +520,7 @@ class _ProfileState extends State<ProfileScreen> {
                                     ),
                                     Expanded(
                                       child: Center(
-                                        child: _buildInfoColumn(
-                                          LineAwesomeIcons.fire_solid,
-                                          'ELO',
-                                          '${currentUser.elo ?? 750}',
-                                          GlobalVar.secondaryColor,
-                                        ),
+                                        child: _buildEloMetricWithHighlight(currentUser),
                                       ),
                                     ),
                                     Expanded(child: SizedBox()),
@@ -556,8 +657,9 @@ class _ProfileState extends State<ProfileScreen> {
                         child: SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                              onPressed: () {
-                                logout();
+                              onPressed: () async {
+                                await logout();
+                                if (!context.mounted) return;
                                 Navigator.pushReplacement(
                                   context,
                                   MaterialPageRoute(
@@ -581,7 +683,17 @@ class _ProfileState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
-                )
+                ),
+                if (_isEloSubTutorialActive) ...[
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        color: Colors.black.withOpacity(0.12),
+                      ),
+                    ),
+                  ),
+                  _buildEloFloatingTutorialDialog(),
+                ],
               ],
             ),
           ),
@@ -658,6 +770,148 @@ class _ProfileState extends State<ProfileScreen> {
         },
       );
     }
+  }
+
+  Widget _buildEloMetricWithHighlight(Student currentUser) {
+    final isFocused = _isEloSubTutorialActive;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 1.0, end: isFocused ? 1.04 : 1.0),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) {
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: AnimatedContainer(
+        key: _eloHighlightKey,
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: isFocused ? Colors.amber.withOpacity(0.16) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isFocused ? Colors.amber.shade600 : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: isFocused
+              ? [
+                  BoxShadow(
+                    color: Colors.amber.withOpacity(0.28),
+                    blurRadius: 16,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: _buildInfoColumn(
+          LineAwesomeIcons.fire_solid,
+          'ELO',
+          '${currentUser.elo ?? 750}',
+          GlobalVar.secondaryColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEloFloatingTutorialDialog() {
+    final isLastStep = _eloTutorialStep == _eloTutorialSteps.length - 1;
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 18,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 12,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.lightbulb_outline,
+                      size: 18, color: AppColors.primaryColor),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'ELO',
+                      style: TextStyle(
+                        fontFamily: 'DIN_Next_Rounded',
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryColor,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${_eloTutorialStep + 1}/${_eloTutorialSteps.length}',
+                    style: TextStyle(
+                      fontFamily: 'DIN_Next_Rounded',
+                      fontSize: 11,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _eloTutorialSteps[_eloTutorialStep],
+                style: const TextStyle(
+                  fontFamily: 'DIN_Next_Rounded',
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _completeEloSubTutorial,
+                    child: const Text(
+                      'Lewati',
+                      style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                    ),
+                    onPressed: () {
+                      if (isLastStep) {
+                        _completeEloSubTutorial();
+                      } else {
+                        setState(() {
+                          _eloTutorialStep++;
+                        });
+                      }
+                    },
+                    child: Text(
+                      isLastStep ? 'Selesai' : 'Lanjut',
+                      style: const TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildInfoColumn(

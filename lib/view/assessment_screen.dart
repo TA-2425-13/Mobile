@@ -350,11 +350,19 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       user?.points = (user?.points ?? 0) + _pointsEarned;
       
       if (widget.uc != null && widget.level != null && widget.chLength != null) {
+        final totalChapter = widget.chLength!;
         if (widget.level == widget.uc!.currentChapter) {
           widget.uc!.currentChapter++;
-          widget.uc!.progress = (((widget.uc!.currentChapter - 1) / widget.chLength!) * 100).toInt();
-          UserCourseService.updateUserCourse(widget.uc!.id, widget.uc!);
         }
+
+        final normalizedCurrentChapter =
+            widget.uc!.currentChapter.clamp(1, totalChapter + 1);
+        final completedChapter = (normalizedCurrentChapter - 1).clamp(0, totalChapter);
+        final normalizedProgress = ((completedChapter / totalChapter) * 100).toInt();
+
+        widget.uc!.currentChapter = normalizedCurrentChapter;
+        widget.uc!.progress = normalizedProgress;
+        UserCourseService.updateUserCourse(widget.uc!.id, widget.uc!);
       }
     });
 

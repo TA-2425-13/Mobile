@@ -17,7 +17,13 @@ import 'login_screen.dart';
 
 class Homescreen extends StatefulWidget {
   final Function(int) updateIndex;
-  const Homescreen({super.key, required this.updateIndex});
+  final VoidCallback onReplayTutorial;
+
+  const Homescreen({
+    super.key,
+    required this.updateIndex,
+    required this.onReplayTutorial,
+  });
 
   @override
   State<Homescreen> createState() => _HomeState();
@@ -39,6 +45,99 @@ class _HomeState extends State<Homescreen> {
   int idUser = 0;
   List<UserBadge>? userBadges = [];
   bool _isFetchingEnrolled = false;
+  final GlobalKey _tutorialButtonKey = GlobalKey();
+
+  Future<void> _showReplayTutorialPopup() async {
+    final buttonContext = _tutorialButtonKey.currentContext;
+    if (buttonContext == null) return;
+
+    final buttonBox = buttonContext.findRenderObject() as RenderBox;
+    final overlayBox = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final topLeft = buttonBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final bottomRight = buttonBox.localToGlobal(
+      buttonBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
+    );
+
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        overlayBox.size.width - bottomRight.dx,
+        bottomRight.dy + 8,
+        topLeft.dx,
+        overlayBox.size.height - topLeft.dy,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      items: [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: SizedBox(
+            width: 220,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Ulangi tutorial?',
+                  style: TextStyle(
+                    fontFamily: 'DIN_Next_Rounded',
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryColor,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Lihat lagi panduan fitur utama LeveLearn dari awal.',
+                  style: TextStyle(
+                    fontFamily: 'DIN_Next_Rounded',
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const PopupMenuDivider(height: 1),
+        const PopupMenuItem<String>(
+          value: 'start',
+          child: Row(
+            children: [
+              Icon(Icons.replay_rounded, size: 18, color: AppColors.primaryColor),
+              SizedBox(width: 8),
+              Text(
+                'Mulai ulang tutorial',
+                style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (selected == 'start' && mounted) {
+      widget.onReplayTutorial();
+    }
+  }
+
+  void _applyLatestSelectedCourseFromPrefs() {
+    final idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
+    Course? selected;
+    for (final c in allCourses) {
+      if (c.id == idCourse) {
+        selected = c;
+        break;
+      }
+    }
+
+    selected ??= allCourses.isEmpty
+        ? null
+        : (allCourses.toList()
+              ..sort((a, b) => (b.progress ?? 0).compareTo(a.progress ?? 0)))
+            .first;
+
+    setState(() {
+      lastestCourse = selected;
+    });
+  }
 
   @override
   void initState() {
@@ -87,22 +186,25 @@ class _HomeState extends State<Homescreen> {
     int? id = pref.getInt('userId');
     if(id != null) {
       try {
-        final result = await CourseService.getEnrolledCourse(id).timeout(Duration(seconds: 10));
+        final result = await CourseService.getEnrolledCourse(
+          id,
+          onRevalidated: (freshData) {
+            if (!mounted) return;
+            setState(() {
+              allCourses = freshData;
+              isLoading = false;
+            });
+            _enrolledCache[id] = List<Course>.from(freshData);
+            _applyLatestSelectedCourseFromPrefs();
+          },
+        ).timeout(Duration(seconds: 10));
         if (!mounted) return;
         setState(() {
           allCourses = result;
           isLoading = false;
         });
         _enrolledCache[id] = List<Course>.from(result);
-        final idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
-        for (var c in allCourses) {
-          if(c.id == idCourse){
-            setState(() {
-              lastestCourse = c;
-            });
-            break;
-          }
-        }
+        _applyLatestSelectedCourseFromPrefs();
       } on TimeoutException catch (_) {
         if (!mounted) return;
         setState(() {
@@ -609,37 +711,51 @@ class _HomeState extends State<Homescreen> {
             ),
           ),
           const SizedBox(width: 12),
-          GestureDetector(
-            onTap: () => widget.updateIndex(4),
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.blue, // Background color
+          Row(
+            children: [
+              IconButton(
+                key: _tutorialButtonKey,
+                tooltip: 'Ulangi tutorial',
+                onPressed: _showReplayTutorialPopup,
+                icon: const Icon(
+                  Icons.tips_and_updates_outlined,
+                  color: AppColors.primaryColor,
+                ),
               ),
-              child: ClipOval(
-                child: user?.image != null && user?.image != ""
-                    ? Image.network(
-                  user!.image!,
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => widget.updateIndex(4),
+                child: Container(
                   width: 50,
                   height: 50,
-                  fit: BoxFit.cover, // Ensures the image fills the container
-                  errorBuilder: (context, error, stackTrace) => Icon(
-                    Icons.person,
-                    size: 30,
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blue, // Background color
                   ),
-                )
-                    : Center(
-                  child: Icon(
-                    Icons.person,
-                    size: 30,
-                    color: Colors.white,
+                  child: ClipOval(
+                    child: user?.image != null && user?.image != ""
+                        ? Image.network(
+                      user!.image!,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover, // Ensures the image fills the container
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.person,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                    )
+                        : Center(
+                      child: Icon(
+                        Icons.person,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           )
         ],
       ),
