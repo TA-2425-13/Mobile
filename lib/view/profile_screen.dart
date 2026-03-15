@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:app/global_var.dart';
 import 'package:app/model/chapter.dart';
 import 'package:app/model/user_badge.dart';
@@ -52,21 +54,30 @@ class _ProfileState extends State<ProfileScreen> {
   bool _isEloSubTutorialActive = false;
   int _eloTutorialStep = 0;
   final GlobalKey _eloHighlightKey = GlobalKey();
+  final GlobalKey _tutorialOverlayStackKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
 
   final List<String> _eloTutorialSteps = const [
     'Ini adalah ELO kamu. Angka ini jadi acuan sistem baru untuk mengatur tingkat kesulitan soal secara adaptif.',
-    'Jika performa assessment kamu bagus, ELO cenderung naik dan soal berikutnya lebih menantang. Jika performa turun, sistem menyesuaikan agar ritme belajar tetap pas. ELO juga dipakai untuk progression badge.',
+    'Performa assessment bagus akan menaikkan ELO dan mendorong soal berikutnya lebih menantang. Jika performa turun, ELO menyesuaikan agar ritme belajar tetap pas. ELO juga dipakai untuk progres badge.',
   ];
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onProfileScroll);
     getUserData();
+  }
+
+  void _onProfileScroll() {
+    if (_isEloSubTutorialActive && mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onProfileScroll);
     _scrollController.dispose();
     super.dispose();
   }
@@ -373,6 +384,7 @@ class _ProfileState extends State<ProfileScreen> {
           : Scaffold(
             backgroundColor: Colors.transparent,
             body: Stack(
+              key: _tutorialOverlayStackKey,
               children: [
                 Container(
                   decoration: BoxDecoration(
@@ -687,8 +699,11 @@ class _ProfileState extends State<ProfileScreen> {
                 if (_isEloSubTutorialActive) ...[
                   Positioned.fill(
                     child: IgnorePointer(
-                      child: Container(
-                        color: Colors.black.withOpacity(0.12),
+                      child: CustomPaint(
+                        painter: _SpotlightScrimPainter(
+                          focusRect: _getEloFocusRect(),
+                          scrimColor: Colors.black.withOpacity(0.12),
+                        ),
                       ),
                     ),
                   ),
@@ -700,6 +715,22 @@ class _ProfileState extends State<ProfileScreen> {
         ]
       )
     );
+  }
+
+  Rect? _getEloFocusRect() {
+    final targetContext = _eloHighlightKey.currentContext;
+    if (targetContext == null) return null;
+
+    final targetBox = targetContext.findRenderObject();
+    final overlayContext = _tutorialOverlayStackKey.currentContext;
+    final overlayBox = overlayContext?.findRenderObject();
+    if (targetBox is! RenderBox || overlayBox is! RenderBox) {
+      return null;
+    }
+
+    final topLeft = targetBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final rect = topLeft & targetBox.size;
+    return rect;
   }
 
   void _showBadgeDetails(BuildContext context, BadgeModel badge) async {
@@ -774,46 +805,39 @@ class _ProfileState extends State<ProfileScreen> {
 
   Widget _buildEloMetricWithHighlight(Student currentUser) {
     final isFocused = _isEloSubTutorialActive;
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 1.0, end: isFocused ? 1.04 : 1.0),
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOutBack,
-      builder: (context, scale, child) {
-        return Transform.scale(scale: scale, child: child);
-      },
-      child: AnimatedContainer(
-        key: _eloHighlightKey,
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: isFocused ? Colors.amber.withOpacity(0.16) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isFocused ? Colors.amber.shade600 : Colors.transparent,
-            width: 2,
-          ),
-          boxShadow: isFocused
-              ? [
-                  BoxShadow(
-                    color: Colors.amber.withOpacity(0.28),
-                    blurRadius: 16,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : null,
+    return AnimatedContainer(
+      key: _eloHighlightKey,
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: isFocused ? Colors.amber.withOpacity(0.16) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isFocused ? Colors.amber.shade600 : Colors.transparent,
+          width: 2,
         ),
-        child: _buildInfoColumn(
-          LineAwesomeIcons.fire_solid,
-          'ELO',
-          '${currentUser.elo ?? 750}',
-          GlobalVar.secondaryColor,
-        ),
+        boxShadow: isFocused
+            ? [
+                BoxShadow(
+                  color: Colors.amber.withOpacity(0.28),
+                  blurRadius: 16,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
+      ),
+      child: _buildInfoColumn(
+        LineAwesomeIcons.fire_solid,
+        'ELO',
+        '${currentUser.elo ?? 750}',
+        GlobalVar.secondaryColor,
       ),
     );
   }
 
   Widget _buildEloFloatingTutorialDialog() {
     final isLastStep = _eloTutorialStep == _eloTutorialSteps.length - 1;
+    final isSecondStep = _eloTutorialStep == 1;
     return Positioned(
       left: 16,
       right: 16,
@@ -821,7 +845,7 @@ class _ProfileState extends State<ProfileScreen> {
       child: Material(
         color: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          padding: EdgeInsets.fromLTRB(14, isSecondStep ? 10 : 12, 14, isSecondStep ? 10 : 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
@@ -856,22 +880,22 @@ class _ProfileState extends State<ProfileScreen> {
                     '${_eloTutorialStep + 1}/${_eloTutorialSteps.length}',
                     style: TextStyle(
                       fontFamily: 'DIN_Next_Rounded',
-                      fontSize: 11,
+                      fontSize: isSecondStep ? 10.5 : 11,
                       color: Colors.grey.shade500,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: isSecondStep ? 6 : 8),
               Text(
                 _eloTutorialSteps[_eloTutorialStep],
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'DIN_Next_Rounded',
-                  fontSize: 12,
+                  fontSize: isSecondStep ? 11.5 : 12,
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: isSecondStep ? 10 : 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -944,6 +968,46 @@ class _ProfileState extends State<ProfileScreen> {
         )
       ],
     );
+  }
+}
+
+class _SpotlightScrimPainter extends CustomPainter {
+  final Rect? focusRect;
+  final Color scrimColor;
+
+  const _SpotlightScrimPainter({
+    required this.focusRect,
+    required this.scrimColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fullRect = Offset.zero & size;
+    final layerBounds = Rect.fromLTWH(0, 0, size.width, size.height);
+
+    canvas.saveLayer(layerBounds, Paint());
+    canvas.drawRect(fullRect, Paint()..color = scrimColor);
+
+    if (focusRect != null) {
+      final cutout = RRect.fromRectAndRadius(
+        focusRect!,
+        const Radius.circular(12),
+      );
+      canvas.drawRRect(
+        cutout,
+        Paint()
+          ..blendMode = ui.BlendMode.clear
+          ..isAntiAlias = true,
+      );
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpotlightScrimPainter oldDelegate) {
+    return oldDelegate.focusRect != focusRect ||
+        oldDelegate.scrimColor != scrimColor;
   }
 }
 
