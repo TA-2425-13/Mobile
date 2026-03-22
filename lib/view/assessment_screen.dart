@@ -607,6 +607,25 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                                         color: AppColors.primaryColor)),
                               ],
                             ),
+                            if (_pointsAwardedPreview != null && _pointsAwardedPreview! > 0)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text('Poin Diraih',
+                                      style: const TextStyle(
+                                          fontFamily: 'DIN_Next_Rounded',
+                                          fontSize: 12,
+                                          color: Colors.grey)),
+                                  Text(
+                                    '+${_pointsAwardedPreview?.toInt()}',
+                                    style: const TextStyle(
+                                      fontFamily: 'DIN_Next_Rounded',
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             if (_eloDeltaQuestion != null &&
                                 _eloDeltaQuestion != 0)
                               Column(
