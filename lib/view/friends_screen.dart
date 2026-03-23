@@ -20,8 +20,9 @@ class _FriendsScreen extends State<FriendsScreen> {
   List<Student> user = [];
 
   List<Student> sortUserbyPoint(List<Student> list) {
-    list.sort((a, b) => b.points!.compareTo(a.points!));
-    return list;
+    final sorted = List<Student>.from(list);
+    sorted.sort((a, b) => (b.points ?? 0).compareTo(a.points ?? 0));
+    return sorted;
   }
 
   List<Student> studentRole(List<Student> list) {
@@ -29,11 +30,18 @@ class _FriendsScreen extends State<FriendsScreen> {
   }
 
   void getAllUser() async {
-    final result = await UserService.getAllUser();
-    if (!mounted) return;
-    setState(() {
-      user = sortUserbyPoint(studentRole(result));
-    });
+    try {
+      final result = await UserService.getAllUser();
+      if (!mounted) return;
+      setState(() {
+        user = sortUserbyPoint(studentRole(result));
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        user = [];
+      });
+    }
   }
 
   @override
@@ -130,31 +138,31 @@ class _FriendsScreen extends State<FriendsScreen> {
   }
 
   Widget _listFriends() {
-    user = sortUserbyPoint(user);
+    final sortedUsers = sortUserbyPoint(user);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: ListView.builder(
-        itemCount: user.length,
+        itemCount: sortedUsers.length,
         itemBuilder: (context, count) {
-          return _listFriendsItem(user[count], count,  count == 0 ? 0 : count == user.length - 1 ? 2 : 1);
+          return _listFriendsItem(sortedUsers[count], count,  count == 0 ? 0 : count == sortedUsers.length - 1 ? 2 : 1);
         },
       ),
     );
   }
 
   Widget _listFriendsForLandscape() {
-    user = sortUserbyPoint(user);
+    final sortedUsers = sortUserbyPoint(user);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: ListView.builder(
         shrinkWrap: true, // This makes ListView take only the space it needs
         physics: NeverScrollableScrollPhysics(), // This disables ListView's own scrolling
-        itemCount: user.length,
+        itemCount: sortedUsers.length,
         itemBuilder: (context, count) {
           return _listFriendsItem(
-              user[count],
+              sortedUsers[count],
               count,
-              count == 0 ? 0 : count == user.length - 1 ? 2 : 1
+              count == 0 ? 0 : count == sortedUsers.length - 1 ? 2 : 1
           );
         },
       ),
