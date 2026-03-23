@@ -27,8 +27,14 @@ class ChatSession {
 }
 
 class ChatSessionApi {
-  static Future<List<ChatSession>> fetchSessions(int userId) async {
-    final url = Uri.parse('${GlobalVar.baseUrl}/chat/session/user/$userId?t=${DateTime.now().millisecondsSinceEpoch}');
+  static Future<List<ChatSession>> fetchSessions(int userId, {int? chapterId}) async {
+    final params = <String, String>{
+      't': DateTime.now().millisecondsSinceEpoch.toString(),
+    };
+    if (chapterId != null && chapterId > 0) {
+      params['chapterId'] = chapterId.toString();
+    }
+    final url = Uri.parse('${GlobalVar.baseUrl}/chat/session/user/$userId').replace(queryParameters: params);
     final response = await http.get(url);
     if (response.statusCode != 200) return [];
     final Map<String, dynamic> body = jsonDecode(response.body);
@@ -36,12 +42,16 @@ class ChatSessionApi {
     return data.map((e) => ChatSession.fromJson(e)).toList();
   }
 
-  static Future<ChatSession?> createSession(int userId) async {
+  static Future<ChatSession?> createSession(int userId, {int? chapterId}) async {
     final url = Uri.parse('${GlobalVar.baseUrl}/chat/session');
+    final payload = <String, dynamic>{'userId': userId};
+    if (chapterId != null && chapterId > 0) {
+      payload['chapterId'] = chapterId;
+    }
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'userId': userId}),
+      body: jsonEncode(payload),
     );
     if (response.statusCode != 200 && response.statusCode != 201) return null;
     final Map<String, dynamic> data = jsonDecode(response.body);

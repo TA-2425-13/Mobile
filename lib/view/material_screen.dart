@@ -202,10 +202,11 @@ class _MaterialScreenState extends State<MaterialScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => ChatbotScreen(
-                    // Reset visible chat per chapter, but keep the same
-                    // session ID so the backend retains persona context.
+                    // Reset visible chat while keeping chapter-specific
+                    // chatbot sessions isolated from other chapters.
                     inheritSession: true,
                     materialId: material!.id,
+                    chapterId: widget.status.chapterId,
                   ),
                 ),
               );

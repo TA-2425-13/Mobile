@@ -20,14 +20,21 @@ class ChatbotScreen extends StatefulWidget {
   final bool startFresh;
   final bool inheritSession;
   final int? materialId;
-  const ChatbotScreen({super.key, this.startFresh = false, this.inheritSession = false, this.materialId});
+  final int? chapterId;
+  const ChatbotScreen({
+    super.key,
+    this.startFresh = false,
+    this.inheritSession = false,
+    this.materialId,
+    this.chapterId,
+  });
 
   @override
   State<ChatbotScreen> createState() => _ChatbotScreenState();
 }
 
 class _ChatbotScreenState extends State<ChatbotScreen> {
-  static const _sessionPrefsKey = 'levely_chat_session_id';
+  static const _sessionPrefsKeyPrefix = 'levely_chat_session_id';
   static const _fallbackAssistantReply = 'Maaf, aku belum bisa menjawab.';
   static const List<String> _thinkingPlaceholders = [
     'Levely lagi mikir sebentar…',
@@ -51,6 +58,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final Random _random = Random();
   String? _currentPlaceholder;
   List<ChatSession> _sessions = [];
+
+  String get _sessionPrefsKey {
+    final chapterId = widget.chapterId;
+    if (chapterId != null && chapterId > 0) {
+      return '${_sessionPrefsKeyPrefix}_$chapterId';
+    }
+    return _sessionPrefsKeyPrefix;
+  }
 
   @override
   void initState() {
@@ -160,7 +175,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     try {
       final response = await http
-        .get(Uri.parse('${GlobalVar.baseUrl}/chat/history/user/$userId'));
+        .get(
+          Uri.parse('${GlobalVar.baseUrl}/chat/history/user/$userId').replace(
+            queryParameters: {
+              if (widget.chapterId != null && widget.chapterId! > 0)
+                'chapterId': widget.chapterId.toString(),
+            },
+          ),
+        );
 
       if (response.statusCode != 200) {
         _showSnack('Gagal memuat riwayat chat (${response.statusCode})');
@@ -380,6 +402,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         'sessionId': _sessionId,
         'userId': _userId,
         if (widget.materialId != null) 'materialId': widget.materialId,
+        if (widget.chapterId != null) 'chapterId': widget.chapterId,
       });
 
     try {
@@ -524,7 +547,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Future<void> _fetchSessions() async {
     if (_userId == null) return;
     setState(() => _isLoadingSessions = true);
-    final sessions = await ChatSessionApi.fetchSessions(_userId!);
+    final sessions = await ChatSessionApi.fetchSessions(_userId!, chapterId: widget.chapterId);
     if (!mounted) return;
     setState(() {
       _sessions = sessions;
