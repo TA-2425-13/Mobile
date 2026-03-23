@@ -21,14 +21,23 @@ import 'package:app/view/chapter_screen.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final int id;
+  final int refreshNonce;
 
-  const CourseDetailScreen({super.key, required this.id});
+  const CourseDetailScreen({
+    super.key,
+    required this.id,
+    this.refreshNonce = 0,
+  });
 
   @override
   State<CourseDetailScreen> createState() => _CourseDetail();
 }
 
 class _CourseDetail extends State<CourseDetailScreen> {
+  static const String _selectedCourseKey = 'lastestSelectedCourse';
+  static const String _selectedCourseAltKey = 'latestSelectedCourse';
+  static const String _selectedCourseLegacyKey = 'getCourseDetail';
+
   static final Map<int, Course> _courseCache = {};
   static final Map<int, List<BadgeModel>> _badgeCache = {};
   static final Map<String, List<Chapter>> _chapterCache = {};
@@ -48,11 +57,21 @@ class _CourseDetail extends State<CourseDetailScreen> {
   bool _isFetchingBadges = false;
   bool _isFetchingChapters = false;
   bool _isFetchingUserCourse = false;
+  bool _isSyncingUserCourse = false;
 
   @override
   void initState() {
     super.initState();
     unawaited(_bootstrap());
+  }
+
+  @override
+  void didUpdateWidget(covariant CourseDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.id != oldWidget.id || widget.refreshNonce != oldWidget.refreshNonce) {
+      unawaited(_refreshForCurrentSelection());
+    }
   }
 
   String _chapterCacheKey() {
@@ -66,11 +85,13 @@ class _CourseDetail extends State<CourseDetailScreen> {
     _isBootstrapped = true;
 
     pref = await SharedPreferences.getInstance();
-    idCourse = widget.id != 0 ? widget.id : (pref.getInt('lastestSelectedCourse') ?? 0);
+    idCourse = await _resolveSelectedCourseId();
     idUser = pref.getInt('userId') ?? 0;
 
     if (idCourse != 0) {
-      unawaited(pref.setInt('lastestSelectedCourse', idCourse));
+      unawaited(pref.setInt(_selectedCourseKey, idCourse));
+      unawaited(pref.setInt(_selectedCourseAltKey, idCourse));
+      unawaited(pref.setInt(_selectedCourseLegacyKey, idCourse));
     }
 
     _hydrateInstantCache();
@@ -92,6 +113,75 @@ class _CourseDetail extends State<CourseDetailScreen> {
       unawaited(getCourseDetail());
       unawaited(getChapter(idCourse));
       unawaited(getListBadge(idCourse));
+    }
+  }
+
+  Future<void> _refreshForCurrentSelection() async {
+    if (!_isBootstrapped) {
+      return;
+    }
+
+    final resolvedCourseId = await _resolveSelectedCourseId();
+    if (!mounted) return;
+
+    if (resolvedCourseId != 0 && resolvedCourseId != idCourse) {
+      setState(() {
+        idCourse = resolvedCourseId;
+        courseDetail = null;
+        listChapter = [];
+        listBadge = null;
+        uc = null;
+        isLoading = true;
+      });
+    }
+
+    if (idCourse == 0) {
+      return;
+    }
+
+    unawaited(getUserCourse());
+    unawaited(getCourseDetail());
+    unawaited(getChapter(idCourse));
+    unawaited(getListBadge(idCourse));
+  }
+
+  Future<int> _resolveSelectedCourseId() async {
+    final prefsInstance = pref;
+    if (widget.id != 0) {
+      return widget.id;
+    }
+
+    int persistedId = prefsInstance.getInt(_selectedCourseKey) ??
+        prefsInstance.getInt(_selectedCourseAltKey) ??
+        prefsInstance.getInt(_selectedCourseLegacyKey) ??
+        0;
+
+    if (persistedId != 0) {
+      return persistedId;
+    }
+
+    final userId = prefsInstance.getInt('userId') ?? 0;
+    if (userId == 0) {
+      return 0;
+    }
+
+    try {
+      final enrolled = await CourseService.getEnrolledCourse(userId);
+      if (enrolled.isEmpty) {
+        return 0;
+      }
+
+      final preferred = enrolled.firstWhere(
+        (course) => (course.progress ?? 0) > 0,
+        orElse: () => enrolled.first,
+      );
+      persistedId = preferred.id;
+      unawaited(prefsInstance.setInt(_selectedCourseKey, persistedId));
+      unawaited(prefsInstance.setInt(_selectedCourseAltKey, persistedId));
+      unawaited(prefsInstance.setInt(_selectedCourseLegacyKey, persistedId));
+      return persistedId;
+    } catch (_) {
+      return 0;
     }
   }
 
@@ -148,7 +238,16 @@ class _CourseDetail extends State<CourseDetailScreen> {
 
     _isFetchingCourse = true;
     try {
-      final result = await CourseService.getCourse(idCourse);
+      final result = await CourseService.getCourse(
+        idCourse,
+        onRevalidated: (freshData) {
+          if (!mounted || freshData.id != idCourse) return;
+          setState(() {
+            courseDetail = freshData;
+          });
+          _courseCache[idCourse] = freshData;
+        },
+      );
       if (!mounted) return;
       setState(() {
         courseDetail = result;
@@ -166,12 +265,24 @@ class _CourseDetail extends State<CourseDetailScreen> {
 
     _isFetchingUserCourse = true;
     try {
-      final fetched = await UserCourseService.getUserCourse(idUser, idCourse);
+      final fetched = await UserCourseService.getUserCourse(
+        idUser,
+        idCourse,
+        onRevalidated: (freshData) {
+          if (!mounted || freshData.courseId != idCourse) return;
+          setState(() {
+            uc = freshData;
+          });
+          _userCourseCache[_chapterCacheKey()] = freshData;
+          unawaited(_syncCourseProgressFromChapters());
+        },
+      );
       if (!mounted) return;
       setState(() {
         uc = fetched;
       });
       _userCourseCache[_chapterCacheKey()] = fetched;
+      unawaited(_syncCourseProgressFromChapters());
     } finally {
       _isFetchingUserCourse = false;
     }
@@ -214,8 +325,51 @@ class _CourseDetail extends State<CourseDetailScreen> {
         isLoading = false;
       });
       _chapterCache[_chapterCacheKey()] = List<Chapter>.from(updatedList);
+      unawaited(_syncCourseProgressFromChapters());
     } finally {
       _isFetchingChapters = false;
+    }
+  }
+
+  Future<void> _syncCourseProgressFromChapters() async {
+    if (_isSyncingUserCourse || uc == null || listChapter.isEmpty) {
+      return;
+    }
+
+    _isSyncingUserCourse = true;
+    try {
+      final sorted = List<Chapter>.from(listChapter)
+        ..sort((a, b) => a.level.compareTo(b.level));
+
+      int completedContiguous = 0;
+      for (final chapter in sorted) {
+        final st = chapter.status;
+        final done = (st?.materialDone ?? false) && (st?.assessmentDone ?? false);
+        if (!done) {
+          break;
+        }
+        completedContiguous++;
+      }
+
+      final total = sorted.length;
+      final desiredCurrentChapter = (completedContiguous + 1).clamp(1, total + 1);
+      final desiredProgress = ((completedContiguous / total) * 100).toInt();
+
+      if (uc!.currentChapter == desiredCurrentChapter && uc!.progress == desiredProgress) {
+        return;
+      }
+
+      uc!.currentChapter = desiredCurrentChapter;
+      uc!.progress = desiredProgress;
+
+      if (mounted) {
+        setState(() {});
+      }
+
+      _userCourseCache[_chapterCacheKey()] = uc!;
+      await UserCourseService.updateUserCourse(uc!.id, uc!);
+    } finally {
+      _isSyncingUserCourse = false;
     }
   }
 

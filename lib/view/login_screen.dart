@@ -5,6 +5,7 @@ import 'package:app/service/user_service.dart';
 import 'package:app/utils/colors.dart';
 import 'package:app/view/main_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
@@ -26,6 +27,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isLoading = false;
 
   void login() async {
+    if (isLoading) return;
+
     setState(() => isLoading = true);
 
     try {
@@ -241,6 +244,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                       child: TextField(
                                         style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                                         controller: emailController,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                                        ],
                                         decoration: InputDecoration(
                                           border: InputBorder.none,
                                           hintText: "Username",
@@ -257,6 +263,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                       child: TextField(
                                         style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                                         controller: passwordController,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                                        ],
                                         obscureText: true,
                                         decoration: InputDecoration(
                                           border: InputBorder.none,

@@ -18,8 +18,9 @@ class ChatMessage {
 
 class ChatbotScreen extends StatefulWidget {
   final bool startFresh;
+  final bool inheritSession;
   final int? materialId;
-  const ChatbotScreen({super.key, this.startFresh = false, this.materialId});
+  const ChatbotScreen({super.key, this.startFresh = false, this.inheritSession = false, this.materialId});
 
   @override
   State<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -100,6 +101,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         ? storedSessionId
         : null;
     });
+
+    // inheritSession: restore session ID for backend persona context but keep
+    // the visible chat blank — history resets per chapter, persona persists.
+    if (widget.inheritSession) {
+      return;
+    }
 
     if (storedSessionId != null && storedSessionId.isNotEmpty) {
       await _fetchHistory(storedSessionId);

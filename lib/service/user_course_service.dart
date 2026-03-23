@@ -55,6 +55,8 @@ class UserCourseService {
       }, body: jsonEncode(request));
 
       if (responsePut.statusCode == 200) {
+        await ApiCacheService.clearCacheContaining('/user/${uc.userId}/courses');
+        await ApiCacheService.clearCacheContaining('/usercourse/${uc.userId}/${uc.courseId}');
         print("Update Successful");
       }
     } catch(e){

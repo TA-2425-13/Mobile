@@ -363,7 +363,13 @@ class _UpdateProfileState extends State<UpdateProfile> {
                           ),
                           ElevatedButton(
                             onPressed: () async{
-                              await prefs.clear();
+                              await prefs.remove('userId');
+                              await prefs.remove('name');
+                              await prefs.remove('role');
+                              await prefs.remove('token');
+                              await prefs.remove('lastestSelectedCourse');
+                              await prefs.remove('latestSelectedCourse');
+                              await prefs.remove('getCourseDetail');
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(

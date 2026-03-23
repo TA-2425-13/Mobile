@@ -202,7 +202,9 @@ class _MaterialScreenState extends State<MaterialScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => ChatbotScreen(
-                    startFresh: true,
+                    // Reset visible chat per chapter, but keep the same
+                    // session ID so the backend retains persona context.
+                    inheritSession: true,
                     materialId: material!.id,
                   ),
                 ),
