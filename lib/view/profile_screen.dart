@@ -19,6 +19,8 @@ import '../model/user.dart';
 import '../service/course_service.dart';
 import '../utils/colors.dart';
 import 'login_screen.dart';
+import 'questionnaire_screen.dart';
+import '../service/evaluation_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final bool isActive;
@@ -256,13 +258,33 @@ class _ProfileState extends State<ProfileScreen> {
   }
 
   Future<void> logout() async {
+    await EvaluationService.endSession();
     await prefs.remove('userId');
     await prefs.remove('name');
     await prefs.remove('role');
     await prefs.remove('token');
+    await prefs.remove('sessionId');
     await prefs.remove('lastestSelectedCourse');
     await prefs.remove('latestSelectedCourse');
     await prefs.remove('getCourseDetail');
+  }
+
+  /// Navigasi setelah logout: ke kuesioner jika belum diisi, ke login jika sudah.
+  void _navigateAfterLogout() {
+    if (!context.mounted) return;
+    final alreadySubmitted =
+        prefs.getBool('questionnaire_submitted') ?? false;
+    if (alreadySubmitted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const QuestionnaireScreen()),
+      );
+    }
   }
 
   @override
@@ -681,12 +703,7 @@ class _ProfileState extends State<ProfileScreen> {
                           child: ElevatedButton(
                               onPressed: () async {
                                 await logout();
-                                if (!context.mounted) return;
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) => LoginScreen()),
-                                );
+                                _navigateAfterLogout();
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: GlobalVar.primaryColor,

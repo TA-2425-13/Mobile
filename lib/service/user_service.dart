@@ -82,7 +82,8 @@ class UserService {
             id: result['data']['id'],
             name: result['data']['name'],
             role: result['data']['role'],
-            token: result['token']
+            token: result['token'],
+            sessionId: result['data']['sessionId'],
         );
         return {
           'value': login,

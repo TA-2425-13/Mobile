@@ -14,6 +14,8 @@ import '../service/user_service.dart';
 import '../utils/colors.dart';
 import 'chatbot_screen.dart';
 import 'login_screen.dart';
+import 'questionnaire_screen.dart';
+import '../service/evaluation_service.dart';
 
 class Homescreen extends StatefulWidget {
   final Function(int) updateIndex;
@@ -306,16 +308,21 @@ class _HomeState extends State<Homescreen> {
     });
   }
 
-  void logout() {
+  void logout() async {
+    await EvaluationService.endSession();
     pref.remove('userId');
     pref.remove('name');
     pref.remove('role');
     pref.remove('token');
+    pref.remove('sessionId');
 
+    if (!mounted) return;
+    final alreadySubmitted = pref.getBool('questionnaire_submitted') ?? false;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => LoginScreen()
+        builder: (context) =>
+            alreadySubmitted ? LoginScreen() : const QuestionnaireScreen(),
       ),
     );
   }

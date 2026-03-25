@@ -3,7 +3,9 @@ import 'package:app/view/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
+import '../service/evaluation_service.dart';
 import 'friends_screen.dart';
 import 'home_screen.dart';
 import 'mycourse_screen.dart';
@@ -28,6 +30,7 @@ class _MainState extends State<Mainscreen> {
   static const String _selectedCourseAltKey = 'latestSelectedCourse';
 
   late SharedPreferences pref;
+  Timer? _heartbeatTimer;
   int idCourse = 0;
   int navIndex = 0;
   bool _isTutorialActive = false;
@@ -86,6 +89,11 @@ class _MainState extends State<Mainscreen> {
     super.initState();
     navIndex = widget.navIndex;
     _initPreferences();
+    // Heartbeat setiap 60 detik untuk tracking durasi sesi evaluasi
+    _heartbeatTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => EvaluationService.heartbeat(),
+    );
   }
 
   void _initPreferences() async {
@@ -94,6 +102,12 @@ class _MainState extends State<Mainscreen> {
 
     getCourseDetail();
     _maybeStartMainTutorial();
+  }
+
+  @override
+  void dispose() {
+    _heartbeatTimer?.cancel();
+    super.dispose();
   }
 
   String _mainTutorialKeyForCurrentUser() {
