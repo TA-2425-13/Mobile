@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/utils/colors.dart';
@@ -43,6 +44,9 @@ void main() {
 
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Hide device system bars by default and allow temporary reveal via edge swipe.
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     await Supabase.initialize(
       url: 'https://itarozdimxukkhwxruti.supabase.co',

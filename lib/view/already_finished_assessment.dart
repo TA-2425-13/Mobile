@@ -5,7 +5,6 @@ import 'package:app/model/assessment.dart';
 import 'package:app/model/chapter_status.dart';
 import 'package:app/model/user.dart';
 import 'package:app/service/chapter_service.dart';
-import 'package:app/service/user_chapter_service.dart';
 import 'package:app/utils/colors.dart';
 
 class AlreadyFinishedAssessmentAssessmentScreen extends StatefulWidget {
@@ -123,20 +122,6 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: child,
-      floatingActionButton: widget.updateStatus != null
-          ? FloatingActionButton.extended(
-              backgroundColor: Colors.redAccent,
-              onPressed: () async {
-                widget.status.assessmentDone = false;
-                widget.status.assessmentAnswer = [];
-                widget.status.assessmentGrade = 0;
-                await UserChapterService.updateChapterStatus(widget.status.id, widget.status);
-                widget.updateStatus!(widget.status);
-              },
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              label: const Text('Reset (Test)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded')),
-            )
-          : null,
     );
   }
 
@@ -170,7 +155,7 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
     
     final nonEssayQuestions = questions.where((q) => q.type != 'EY').toList();
     final totalAssessable = nonEssayQuestions.isEmpty ? 1 : nonEssayQuestions.length;
-    double rangeScore = 100 / totalAssessable;
+    final rangeScore = (100 / totalAssessable).ceil();
 
     final hasPreloadedAnswers = questions.any((q) => q.selectedAnswer.trim().isNotEmpty);
     if (!hasPreloadedAnswers && status.assessmentAnswer.isNotEmpty) {
@@ -186,7 +171,7 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
       final current = questions[i];
       if (current.type == 'EY') {
         current.isCorrect = false;
-        current.score = current.score;
+        current.score = 0;
         continue;
       }
 
@@ -198,13 +183,21 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
       current.isCorrect = isCorrect;
       if (isCorrect) {
         if (current.score <= 0) {
-          current.score = rangeScore.ceil();
+          current.score = rangeScore;
         }
         correctAnswer++;
+      } else {
+        current.score = 0;
       }
     }
 
-    point = status.assessmentGrade;
+    // Score must reflect objective questions only and ignore essay.
+    point = nonEssayQuestions.fold<int>(0, (sum, q) => sum + q.score);
+
+    // Fallback to stored grade only when there is no objective question in payload.
+    if (nonEssayQuestions.isEmpty) {
+      point = status.assessmentGrade;
+    }
     return true; // Ensure the future completes successfully
   }
 

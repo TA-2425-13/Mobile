@@ -750,6 +750,29 @@ class _ProfileState extends State<ProfileScreen> {
     return rect;
   }
 
+  String _buildBadgeDescription(BadgeModel badge, Course course, Chapter chapter) {
+    final normalizedName = badge.name.trim().toLowerCase();
+
+    switch (normalizedName) {
+      case 'beginner':
+        return 'Badge Beginner diberikan saat kamu mulai menunjukkan pemahaman dasar pada materi ${course.courseName}. Terus lanjutkan progresmu ke level berikutnya.';
+      case 'basic understanding':
+        return 'Badge Basic Understanding menandakan kamu sudah memahami konsep-konsep inti pada materi ${course.courseName}. Pertahankan konsistensi belajarmu.';
+      case 'developing learner':
+        return 'Badge Developing Learner menunjukkan kemampuanmu mulai berkembang dengan stabil. Kamu sedang berada di jalur yang tepat untuk naik level.';
+      case 'intermediate':
+        return 'Badge Intermediate menandakan kemampuanmu sudah berada di tingkat menengah. Kamu berhasil melewati tantangan materi ${chapter.name} dengan baik.';
+      case 'proficient':
+        return 'Badge Proficient diberikan saat performamu sudah kuat dan konsisten. Tingkat pemahamanmu berada di atas rata-rata pembelajar.';
+      case 'advanced':
+        return 'Badge Advanced menunjukkan penguasaan materi yang tinggi. Kamu siap menghadapi soal dengan tingkat kesulitan lebih menantang.';
+      case 'mastery':
+        return 'Badge Mastery adalah pencapaian tertinggi. Ini menandakan kamu telah menunjukkan penguasaan mendalam pada materi ${course.courseName}.';
+      default:
+        return 'Badge ini diperoleh karena telah berhasil menyelesaikan ${course.courseName} sampai pada chapter ${chapter.name}.';
+    }
+  }
+
   void _showBadgeDetails(BuildContext context, BadgeModel badge) async {
     Course resultCourse = await getCourseById(badge.courseId);
     Chapter resultChapter = await getChapterById(badge.chapterId);
@@ -785,13 +808,9 @@ class _ProfileState extends State<ProfileScreen> {
                     fontSize: 16,
                   ),
                 ),
-                Text(
-                  '(${badge.type})',
-                  style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
-                ),
                 SizedBox(height: 8),
                 Text(
-                  'Badge ini diperoleh karena telah berhasil menyelesaikan ${resultCourse.courseName} sampai pada chapter ${resultChapter.name}',
+                  _buildBadgeDescription(badge, resultCourse, resultChapter),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                 ),

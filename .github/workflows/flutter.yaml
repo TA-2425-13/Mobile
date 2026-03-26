@@ -93,7 +93,7 @@ jobs:
         with:
           appId: 1:647460537786:android:e525a74d6979a72ca98983
           token: ${{ secrets.FIREBASE_TOKEN }}
-          groups: testers
+          groups: testers,students
           file: build/app/outputs/bundle/release/app-release.aab
 
       - name: Fallback to APK Upload
@@ -102,7 +102,7 @@ jobs:
         with:
           appId: 1:647460537786:android:e525a74d6979a72ca98983
           token: ${{ secrets.FIREBASE_TOKEN }}
-          groups: testers
+          groups: testers,students
           file: build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload AAB artifact
