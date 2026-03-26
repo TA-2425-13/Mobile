@@ -140,16 +140,17 @@ class _ProfileState extends State<ProfileScreen> {
     }
   }
 
-  List<Student> sortUserbyPoint(List<Student> list) {
-    list.sort((a, b) => b.points!.compareTo(a.points!));
-    return list;
+  List<Student> sortUserByElo(List<Student> list) {
+    final sorted = List<Student>.from(list);
+    sorted.sort((a, b) => (b.elo ?? 0).compareTo(a.elo ?? 0));
+    return sorted;
   }
 
   Future<void> getAllUser() async {
     final result = await UserService.getAllUser();
     if (!mounted) return;
     setState(() {
-      list = sortUserbyPoint(studentRole(result));
+      list = sortUserByElo(studentRole(result));
     });
     for (int i = 0; i < list.length; i++) {
       if(list[i].id == user?.id){

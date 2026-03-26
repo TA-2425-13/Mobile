@@ -19,9 +19,9 @@ class _FriendsScreen extends State<FriendsScreen> {
 
   List<Student> user = [];
 
-  List<Student> sortUserbyPoint(List<Student> list) {
+  List<Student> sortUserByElo(List<Student> list) {
     final sorted = List<Student>.from(list);
-    sorted.sort((a, b) => (b.points ?? 0).compareTo(a.points ?? 0));
+    sorted.sort((a, b) => (b.elo ?? 0).compareTo(a.elo ?? 0));
     return sorted;
   }
 
@@ -34,7 +34,7 @@ class _FriendsScreen extends State<FriendsScreen> {
       final result = await UserService.getAllUser();
       if (!mounted) return;
       setState(() {
-        user = sortUserbyPoint(studentRole(result));
+        user = sortUserByElo(studentRole(result));
       });
     } catch (_) {
       if (!mounted) return;
@@ -138,7 +138,7 @@ class _FriendsScreen extends State<FriendsScreen> {
   }
 
   Widget _listFriends() {
-    final sortedUsers = sortUserbyPoint(user);
+    final sortedUsers = sortUserByElo(user);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: ListView.builder(
@@ -151,7 +151,7 @@ class _FriendsScreen extends State<FriendsScreen> {
   }
 
   Widget _listFriendsForLandscape() {
-    final sortedUsers = sortUserbyPoint(user);
+    final sortedUsers = sortUserByElo(user);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: ListView.builder(
@@ -222,7 +222,7 @@ class _FriendsScreen extends State<FriendsScreen> {
               ],
             ),
             trailing: Text(
-              '${user.points} Poin',
+              '${user.elo ?? 0} ELO',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
             ),
           ),
@@ -275,7 +275,7 @@ class _FriendsScreen extends State<FriendsScreen> {
     final image = student?.image;
     final hasImage = image != null && image.isNotEmpty;
     final displayName = student?.name ?? '';
-    final points = student?.points ?? 0;
+    final elo = student?.elo ?? 0;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -308,7 +308,7 @@ class _FriendsScreen extends State<FriendsScreen> {
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            '$points pts',
+            '$elo ELO',
             style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),
           ),
         ),

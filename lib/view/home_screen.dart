@@ -231,9 +231,10 @@ class _HomeState extends State<Homescreen> {
     }
   }
 
-  List<Student> sortUserbyPoint(List<Student> list) {
-    list.sort((a, b) => b.points!.compareTo(a.points!));
-    return list;
+  List<Student> sortUserByElo(List<Student> list) {
+    final sorted = List<Student>.from(list);
+    sorted.sort((a, b) => (b.elo ?? 0).compareTo(a.elo ?? 0));
+    return sorted;
   }
 
   List<Student> studentRole(List<Student> list) {
@@ -244,7 +245,7 @@ class _HomeState extends State<Homescreen> {
     try {
       final result = await UserService.getAllUser().timeout(Duration(seconds: 10));
       setState(() {
-        list = sortUserbyPoint(studentRole(result));
+        list = sortUserByElo(studentRole(result));
       });
 
       if (idUser == 0) return;
@@ -527,7 +528,7 @@ class _HomeState extends State<Homescreen> {
                           ],
                         ),
                         trailing: Text(
-                          '${list[index].points} Poin',
+                          '${list[index].elo ?? 0} ELO',
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
                         ),
                       ),
