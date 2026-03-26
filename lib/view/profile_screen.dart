@@ -19,7 +19,6 @@ import '../model/user.dart';
 import '../service/course_service.dart';
 import '../utils/colors.dart';
 import 'login_screen.dart';
-import 'questionnaire_screen.dart';
 import '../service/evaluation_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -269,22 +268,13 @@ class _ProfileState extends State<ProfileScreen> {
     await prefs.remove('getCourseDetail');
   }
 
-  /// Navigasi setelah logout: ke kuesioner jika belum diisi, ke login jika sudah.
+  /// Navigasi setelah logout: selalu ke login.
   void _navigateAfterLogout() {
     if (!context.mounted) return;
-    final alreadySubmitted =
-        prefs.getBool('questionnaire_submitted') ?? false;
-    if (alreadySubmitted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const QuestionnaireScreen()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   @override

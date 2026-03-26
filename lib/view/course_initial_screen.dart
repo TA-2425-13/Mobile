@@ -274,32 +274,13 @@ class _CourseInitialScreenState extends State<CourseInitialScreen> {
     }
   }
 
-  String _normalizeBadgeImageUrl(String? imageUrl) {
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return '';
-    }
-
-    if (imageUrl.contains('imk-1.png')) {
-      return imageUrl.replaceAll('imk-1.png', 'beginner.png');
-    }
-    if (imageUrl.contains('imk-2.png')) {
-      return imageUrl.replaceAll('imk-2.png', 'intermediate.png');
-    }
-    if (imageUrl.contains('imk-3.png')) {
-      return imageUrl.replaceAll('imk-3.png', 'advanced.png');
-    }
-
-    return imageUrl;
-  }
-
   Widget _badgeIcon(String? rawUrl) {
-    final normalizedUrl = _normalizeBadgeImageUrl(rawUrl);
-    if (normalizedUrl.isEmpty) {
+    if (rawUrl == null || rawUrl.isEmpty) {
       return Image.asset('lib/assets/empty.png', width: 50, height: 50);
     }
 
     return Image.network(
-      normalizedUrl,
+      rawUrl,
       width: 50,
       height: 50,
       fit: BoxFit.cover,

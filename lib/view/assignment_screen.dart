@@ -18,9 +18,11 @@ import 'package:flutter_file_downloader/flutter_file_downloader.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../service/user_course_service.dart';
 import 'congratulation_screen.dart';
+import 'questionnaire_screen.dart';
 
 class AssignmentScreen extends StatefulWidget {
   final ChapterStatus status;
@@ -221,13 +223,33 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                         MaterialPageRoute(
                           builder: (context) => CongratulationsScreen(
                             message: "You have successfully completed this assignment!",
-                            onContinue: () {
+                            onContinue: () async {
+                              final prefs = await SharedPreferences.getInstance();
+                              final alreadySubmitted =
+                                  prefs.getBool('questionnaire_submitted') ?? false;
+                              final shouldOpenQuestionnaire =
+                                  widget.level == 8 && !alreadySubmitted;
+
+                              if (!context.mounted) return;
+
+                              if (shouldOpenQuestionnaire) {
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const QuestionnaireScreen(redirectToLogin: false),
+                                  ),
+                                  (route) => false,
+                                );
+                                return;
+                              }
+
                               Navigator.pushAndRemoveUntil(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => Mainscreen(navIndex: 2),
                                 ),
-                                    (route) => false, // Remove all previous routes
+                                (route) => false,
                               );
                             },
                             idBadge: idBadge,

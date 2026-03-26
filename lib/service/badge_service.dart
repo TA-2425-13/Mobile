@@ -98,19 +98,14 @@ class BadgeService {
   }) async {
     try {
       final uri = Uri.parse('${GlobalVar.baseUrl}/user/$userId/badges');
-      final response = await ApiCacheService.getSWR(
-        uri,
-        onRevalidated: (freshResponse) {
-          if (onRevalidated == null) {
-            return;
-          }
-          final freshResult = jsonDecode(freshResponse.body);
-          final freshList = _parseUserBadgeList(freshResult);
-          onRevalidated(freshList);
-        },
-      );
+      await ApiCacheService.clearCacheForUrl(uri);
+      final response = await ApiCacheService.forceRefresh(uri);
       final result = jsonDecode(response.body);
       final list = _parseUserBadgeList(result);
+
+      if (onRevalidated != null) {
+        onRevalidated(list);
+      }
 
       if (_hasLegacyBadgeNames(list)) {
         return _refreshBadgesFromNetwork(uri, onRevalidated: onRevalidated);
@@ -132,19 +127,14 @@ class BadgeService {
   }) async {
     try {
       final uri = Uri.parse('${GlobalVar.baseUrl}/user/$userId/badges');
-      final response = await ApiCacheService.getSWR(
-        uri,
-        onRevalidated: (freshResponse) {
-          if (onRevalidated == null) {
-            return;
-          }
-          final freshResult = jsonDecode(freshResponse.body);
-          final freshList = _parseUserBadgeList(freshResult);
-          onRevalidated(freshList);
-        },
-      );
+      await ApiCacheService.clearCacheForUrl(uri);
+      final response = await ApiCacheService.forceRefresh(uri);
       final result = jsonDecode(response.body);
       final list = _parseUserBadgeList(result);
+
+      if (onRevalidated != null) {
+        onRevalidated(list);
+      }
 
       if (_hasLegacyBadgeNames(list)) {
         return _refreshBadgesFromNetwork(uri, onRevalidated: onRevalidated);

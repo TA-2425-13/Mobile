@@ -5,11 +5,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../global_var.dart';
 import 'login_screen.dart';
+import 'main_screen.dart';
 
 /// Layar kuesioner pasca-penggunaan (8 item, 1-5 Likert).
-/// Ditampilkan sekali setelah sesi evaluasi berakhir (dipanggil dari logout).
+/// Dapat dipanggil setelah evaluasi selesai (mis. selesai Chapter 8).
 class QuestionnaireScreen extends StatefulWidget {
-  const QuestionnaireScreen({super.key});
+  final bool redirectToLogin;
+
+  const QuestionnaireScreen({
+    super.key,
+    this.redirectToLogin = true,
+  });
 
   @override
   State<QuestionnaireScreen> createState() => _QuestionnaireScreenState();
@@ -104,7 +110,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       if (response.statusCode == 201 || response.statusCode == 409) {
         // 409 = already submitted — still mark as done and proceed
         await prefs.setBool(_submittedKey, true);
-        _navigateToLogin();
+        _navigateAfterQuestionnaire();
       } else {
         _showError('Gagal mengirim kuesioner (${response.statusCode}). Coba lagi.');
         setState(() => _isSubmitting = false);
@@ -117,14 +123,24 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
 
   void _skip() async {
     // Allow skipping — data log sudah cukup untuk analisis
-    _navigateToLogin();
+    _navigateAfterQuestionnaire();
   }
 
-  void _navigateToLogin() {
+  void _navigateAfterQuestionnaire() {
     if (!mounted) return;
+
+    if (widget.redirectToLogin) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+      return;
+    }
+
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => Mainscreen(navIndex: 2)),
       (route) => false,
     );
   }

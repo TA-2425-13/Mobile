@@ -14,7 +14,6 @@ import '../service/user_service.dart';
 import '../utils/colors.dart';
 import 'chatbot_screen.dart';
 import 'login_screen.dart';
-import 'questionnaire_screen.dart';
 import '../service/evaluation_service.dart';
 
 class Homescreen extends StatefulWidget {
@@ -317,12 +316,10 @@ class _HomeState extends State<Homescreen> {
     pref.remove('sessionId');
 
     if (!mounted) return;
-    final alreadySubmitted = pref.getBool('questionnaire_submitted') ?? false;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            alreadySubmitted ? LoginScreen() : const QuestionnaireScreen(),
+        builder: (context) => LoginScreen(),
       ),
     );
   }

@@ -5,23 +5,47 @@ import 'package:app/global_var.dart';
 class ChatSession {
   final String id;
   final String? title;
+  final int? chapterId;
 
-  ChatSession({required this.id, this.title});
+  ChatSession({required this.id, this.title, this.chapterId});
+
+  static int? _parseChapterId(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is num) {
+      final parsed = value.toInt();
+      return parsed > 0 ? parsed : null;
+    }
+    final parsed = int.tryParse(value.toString());
+    if (parsed == null || parsed <= 0) {
+      return null;
+    }
+    return parsed;
+  }
 
   factory ChatSession.fromJson(Map<String, dynamic> json) {
+    final metadataRaw = json['metadata'];
+    final metadata = metadataRaw is Map<String, dynamic>
+      ? metadataRaw
+      : <String, dynamic>{};
+
     return ChatSession(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString(),
+      chapterId: _parseChapterId(metadata['chapterId']),
     );
   }
 
   ChatSession copyWith({
     String? id,
     String? title,
+    int? chapterId,
   }) {
     return ChatSession(
       id: id ?? this.id,
       title: title ?? this.title,
+      chapterId: chapterId ?? this.chapterId,
     );
   }
 }
@@ -39,7 +63,11 @@ class ChatSessionApi {
     if (response.statusCode != 200) return [];
     final Map<String, dynamic> body = jsonDecode(response.body);
     final List<dynamic> data = body['sessions'] ?? [];
-    return data.map((e) => ChatSession.fromJson(e)).toList();
+    final sessions = data.map((e) => ChatSession.fromJson(e)).toList();
+    if (chapterId != null && chapterId > 0) {
+      return sessions.where((session) => session.chapterId == chapterId).toList();
+    }
+    return sessions;
   }
 
   static Future<ChatSession?> createSession(int userId, {int? chapterId}) async {
