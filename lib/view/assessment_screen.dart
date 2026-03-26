@@ -9,6 +9,7 @@ import 'package:app/model/user_course.dart';
 import 'package:app/service/chapter_service.dart';
 import 'package:app/service/user_chapter_service.dart';
 import 'package:app/service/user_course_service.dart';
+import 'package:app/service/user_service.dart';
 import 'package:app/utils/colors.dart';
 
 class AssessmentScreen extends StatefulWidget {
@@ -88,7 +89,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     status = widget.status;
     user = widget.user;
     _grade = status.assessmentGrade;
-    _pointsEarned = status.assessmentEloDelta; // Use existing field for both or keep 0
+    _pointsEarned = 0;
     _eloDeltaFinal = status.assessmentEloDelta;
     _bootstrapCurrentAttempt();
   }
@@ -250,7 +251,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       _upsertServedQuestion(current);
       if (completed) {
         final result = response['result'] as Map<String, dynamic>? ?? {};
-        _applyFinalResult(result);
+        await _applyFinalResult(result);
         await _reloadLatestAttemptForResult();
         return;
       }
@@ -331,7 +332,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     }
   }
 
-  void _applyFinalResult(Map<String, dynamic> result) {
+  Future<void> _applyFinalResult(Map<String, dynamic> result) async {
     setState(() {
       _grade = (result['grade'] as int?) ?? 0;
       _pointsEarned = (result['pointsEarned'] as int?) ?? 0;
@@ -339,6 +340,12 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       _correctAnswer = (result['correctAnswers'] as int?) ?? 0;
       _aiFeedback = result['aiFeedback']?.toString();
       _newDifficultyLabel = result['newDifficulty']?.toString();
+      if (result['courseEloStart'] is num) {
+        _courseEloBefore = (result['courseEloStart'] as num).toInt();
+      }
+      if (result['courseEloEnd'] is num) {
+        _courseEloAfter = (result['courseEloEnd'] as num).toInt();
+      }
       _assessmentFinished = true;
       _assessmentStarted = false;
       _attemptId = null;
@@ -347,7 +354,6 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       status.assessmentEloDelta = _eloDeltaFinal;
       status.assessmentAnswer =
           _servedQuestions.map((q) => q.selectedAnswer).toList();
-      user?.points = (user?.points ?? 0) + _pointsEarned;
       
       if (widget.uc != null && widget.level != null && widget.chLength != null) {
         final totalChapter = widget.chLength!;
@@ -370,7 +376,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     widget.updateAssessmentStarted(false);
     widget.updateMaterialLocked(false);
     widget.updateStatus(status);
-    _persistStatus();
+    await _persistStatus();
+    await _refreshUserSnapshot();
   }
 
   Future<void> _persistStatus() async {
@@ -378,6 +385,21 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       status = await UserChapterService.updateChapterStatus(status.id, status);
     } catch (_error) {
       // Keep local optimistic state.
+    }
+  }
+
+  Future<void> _refreshUserSnapshot() async {
+    if (user == null) return;
+    try {
+      final refreshed = await UserService.getUserById(user!.id);
+      if (!mounted) return;
+      setState(() {
+        user?.points = refreshed.points;
+        user?.elo = refreshed.elo;
+        user?.eloTitle = refreshed.eloTitle;
+      });
+    } catch (_error) {
+      // Keep local data if refresh fails.
     }
   }
 
