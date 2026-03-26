@@ -45,6 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
           await prefs.setString('name', credential.name);
           await prefs.setString('role', credential.role);
           await prefs.setString('token', credential.token);
+          if (credential.sessionId != null) {
+            await prefs.setInt('sessionId', credential.sessionId!);
+          }
 
           Navigator.pushReplacement(
             context,
