@@ -89,7 +89,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     status = widget.status;
     user = widget.user;
     _grade = status.assessmentGrade;
-    _pointsEarned = 0;
+    // Ambil poin dari status jika assessment sudah pernah selesai sebelumnya
+    _pointsEarned = status.assessmentPointsEarned;
     _eloDeltaFinal = status.assessmentEloDelta;
     _bootstrapCurrentAttempt();
   }
@@ -333,11 +334,22 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   }
 
   Future<void> _applyFinalResult(Map<String, dynamic> result) async {
+    // Helper: konversi num/double/int dari JSON ke int dengan aman
+    int safeInt(dynamic v, [int fallback = 0]) {
+      if (v == null) return fallback;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString()) ?? fallback;
+    }
+
     setState(() {
-      _grade = (result['grade'] as int?) ?? 0;
-      _pointsEarned = (result['pointsEarned'] as int?) ?? 0;
-      _eloDeltaFinal = (result['eloDelta'] as int?) ?? _pointsEarned;
-      _correctAnswer = (result['correctAnswers'] as int?) ?? 0;
+      _grade = safeInt(result['grade']);
+      _pointsEarned = safeInt(result['pointsEarned']);
+      // Prioritaskan 'eloDelta', fallback ke 'pointsEarned' jika tidak ada
+      _eloDeltaFinal = result.containsKey('eloDelta')
+          ? safeInt(result['eloDelta'])
+          : _pointsEarned;
+      _correctAnswer = safeInt(result['correctAnswers']);
       _aiFeedback = result['aiFeedback']?.toString();
       _newDifficultyLabel = result['newDifficulty']?.toString();
       if (result['courseEloStart'] is num) {
@@ -352,9 +364,11 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       status.assessmentDone = true;
       status.assessmentGrade = _grade;
       status.assessmentEloDelta = _eloDeltaFinal;
+      // Simpan pointsEarned ke status agar bisa ditampilkan ulang setelah navigasi
+      status.assessmentPointsEarned = _pointsEarned;
       status.assessmentAnswer =
           _servedQuestions.map((q) => q.selectedAnswer).toList();
-      
+
       if (widget.uc != null && widget.level != null && widget.chLength != null) {
         final totalChapter = widget.chLength!;
         if (widget.level == widget.uc!.currentChapter) {

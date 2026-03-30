@@ -64,9 +64,11 @@ class UserChapterService {
         "assessmentAnswer": jsonEncode(user.assessmentAnswer),
         "submission": user.submission,
         "assessmentGrade": user.assessmentGrade,
+        "assessmentPointsEarned": user.assessmentPointsEarned,
         "timeStarted": user.timeStarted.toUtc().toIso8601String(),
         "timeFinished": user.timeFinished.toUtc().toIso8601String(),
       };
+
       final responsePut = await http.put(Uri.parse('${GlobalVar.baseUrl}/userchapter/$id'), headers: {
         'Content-type' : 'application/json; charset=utf-8',
         'Accept': 'application/json',

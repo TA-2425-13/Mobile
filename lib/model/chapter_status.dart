@@ -13,6 +13,7 @@ class ChapterStatus {
   List<String> assessmentAnswer;
   int assessmentGrade;
   int assessmentEloDelta;
+  int assessmentPointsEarned; // Points dari assessment (untuk ditampilkan ulang)
   String? submission;
   DateTime timeStarted;
   DateTime timeFinished;
@@ -33,6 +34,7 @@ class ChapterStatus {
     required this.assessmentAnswer,
     required this.assessmentGrade,
     required this.assessmentEloDelta,
+    this.assessmentPointsEarned = 0,
     this.submission,
     required this.timeStarted,
     required this.timeFinished,
@@ -43,52 +45,47 @@ class ChapterStatus {
   });
 
   factory ChapterStatus.fromJson(Map<String, dynamic> json) {
-    if (json['assessmentAnswer'].runtimeType == String) {
-      final resultListAnswer = (jsonDecode(json['assessmentAnswer']) as List)
-          .map((item) => item.toString()) // Convert each item to String
-          .toList();
-      return ChapterStatus(
-        id: json['id'],
-        userId: json['userId'],
-        chapterId: json['chapterId'],
-        isStarted: json['isStarted'],
-        isCompleted: json['isCompleted'],
-        materialDone: json['materialDone'],
-        assessmentDone: json['assessmentDone'],
-        assignmentDone: json['assignmentDone'],
-        assessmentAnswer: resultListAnswer,
-        assessmentGrade: json['assessmentGrade'],
-        assessmentEloDelta: json['assessmentEloDelta'] ?? 0,
-        submission: json['submission'],
-        timeStarted: DateTime.parse(json['timeStarted']),
-        timeFinished: DateTime.parse(json['timeFinished']),
-        assignmentScore: json['assignmentScore'] ?? 0,
-        assignmentFeedback: json['assignmentFeedback'] ?? '',
-        createdAt: DateTime.parse(json['createdAt']),
-        updatedAt: DateTime.parse(json['updatedAt']),
-      );
-    } else {
-      return ChapterStatus(
-        id: json['id'],
-        userId: json['userId'],
-        chapterId: json['chapterId'],
-        isStarted: json['isStarted'],
-        isCompleted: json['isCompleted'],
-        materialDone: json['materialDone'],
-        assessmentDone: json['assessmentDone'],
-        assignmentDone: json['assignmentDone'],
-        assessmentAnswer: json['assessmentAnswer'],
-        assessmentGrade: json['assessmentGrade'],
-        assessmentEloDelta: json['assessmentEloDelta'] ?? 0,
-        submission: json['submission'],
-        timeStarted: DateTime.parse(json['timeStarted']),
-        timeFinished: DateTime.parse(json['timeFinished']),
-        assignmentScore: json['assignmentScore'] ?? 0,
-        assignmentFeedback: json['assignmentFeedback'] ?? '',
-        createdAt: DateTime.parse(json['createdAt']),
-        updatedAt: DateTime.parse(json['updatedAt']),
-      );
+    // Helper: parse int dengan aman dari num/double/int/String
+    int safeInt(dynamic v, [int fallback = 0]) {
+      if (v == null) return fallback;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString()) ?? fallback;
     }
+
+    List<String> parseAnswers(dynamic raw) {
+      if (raw == null) return [];
+      if (raw is List) return raw.map((e) => e.toString()).toList();
+      if (raw is String) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is List) return decoded.map((e) => e.toString()).toList();
+        } catch (_) {}
+      }
+      return [];
+    }
+
+    return ChapterStatus(
+      id: safeInt(json['id']),
+      userId: safeInt(json['userId']),
+      chapterId: safeInt(json['chapterId']),
+      isStarted: json['isStarted'] == true,
+      isCompleted: json['isCompleted'] == true,
+      materialDone: json['materialDone'] == true,
+      assessmentDone: json['assessmentDone'] == true,
+      assignmentDone: json['assignmentDone'] == true,
+      assessmentAnswer: parseAnswers(json['assessmentAnswer']),
+      assessmentGrade: safeInt(json['assessmentGrade']),
+      assessmentEloDelta: safeInt(json['assessmentEloDelta']),
+      assessmentPointsEarned: safeInt(json['assessmentPointsEarned']),
+      submission: json['submission']?.toString(),
+      timeStarted: DateTime.parse(json['timeStarted'] ?? DateTime.now().toIso8601String()),
+      timeFinished: DateTime.parse(json['timeFinished'] ?? DateTime.now().toIso8601String()),
+      assignmentScore: safeInt(json['assignmentScore']),
+      assignmentFeedback: json['assignmentFeedback']?.toString() ?? '',
+      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      updatedAt: DateTime.parse(json['updatedAt'] ?? DateTime.now().toIso8601String()),
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -104,6 +101,7 @@ class ChapterStatus {
       'assessmentAnswer': assessmentAnswer,
       'assessmentGrade': assessmentGrade,
       'assessmentEloDelta': assessmentEloDelta,
+      'assessmentPointsEarned': assessmentPointsEarned,
       'submission': submission,
       'timeStarted': timeStarted.toUtc().toIso8601String(),
       'timeFinished': timeFinished.toUtc().toIso8601String(),
