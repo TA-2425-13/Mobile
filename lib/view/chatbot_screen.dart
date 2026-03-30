@@ -342,9 +342,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         assistantIndex: assistantIndex,
       );
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       final normalizedReply = reply.trim().isEmpty
         ? _fallbackAssistantReply
@@ -358,15 +356,23 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         _streamHasProducedContent = false;
         _currentPlaceholder = null;
       });
+    } on _PartialStreamResult catch (result) {
+      // Koneksi putus tapi sudah ada sebagian konten — tampilkan apa yang ada
+      if (!mounted) return;
+      final partial = result.partial.trim();
+      final finalReply = partial.isNotEmpty ? partial : _fallbackAssistantReply;
+      setState(() {
+        _messages[assistantIndex] = ChatMessage(content: finalReply, isUser: false);
+        _addToHistory(isUser: false, content: finalReply);
+        _activeStreamIndex = null;
+        _streamHasProducedContent = false;
+        _currentPlaceholder = null;
+      });
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       final message = 'Terjadi kesalahan: ${error.toString()}';
       setState(() {
-        _messages[assistantIndex] =
-          ChatMessage(content: message, isUser: false);
+        _messages[assistantIndex] = ChatMessage(content: message, isUser: false);
         _activeStreamIndex = null;
         _streamHasProducedContent = false;
         _currentPlaceholder = null;
@@ -381,31 +387,38 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           }
         });
       }
-      // Refresh sessions to update titles if generated
       if (_sessionId != null) {
         _fetchSessions();
       }
     }
   }
 
+  /// Coba kirim via stream SSE.
+  /// - Jika koneksi putus di tengah jalan dan sudah ada konten → lempar [_PartialStreamResult]
+  /// - Jika koneksi putus sebelum ada konten → otomatis retry via non-stream endpoint
+  /// - Jika server error / timeout → lempar Exception
   Future<String> _streamAssistantReply({
     required String prompt,
     required int assistantIndex,
   }) async {
+    final body = jsonEncode({
+      'message': prompt,
+      'history': _history,
+      'sessionId': _sessionId,
+      'userId': _userId,
+      if (widget.materialId != null) 'materialId': widget.materialId,
+      if (widget.chapterId != null) 'chapterId': widget.chapterId,
+    });
+
     final client = http.Client();
-    final uri = Uri.parse('${GlobalVar.baseUrl}/chat/stream');
-    final request = http.Request('POST', uri)
-      ..headers['Content-Type'] = 'application/json'
-      ..body = jsonEncode({
-        'message': prompt,
-        'history': _history,
-        'sessionId': _sessionId,
-        'userId': _userId,
-        if (widget.materialId != null) 'materialId': widget.materialId,
-        if (widget.chapterId != null) 'chapterId': widget.chapterId,
-      });
+    String replyBuffer = '';
 
     try {
+      final streamUri = Uri.parse('${GlobalVar.baseUrl}/chat/stream');
+      final request = http.Request('POST', streamUri)
+        ..headers['Content-Type'] = 'application/json'
+        ..body = body;
+
       final response = await client.send(request);
 
       if (response.statusCode != 200) {
@@ -414,11 +427,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
       final contentType = response.headers['content-type'] ?? '';
 
+      // Jika server kirim response biasa (bukan SSE)
       if (!contentType.toLowerCase().contains('text/event-stream')) {
         final bodyText = await response.stream.bytesToString();
-        if (bodyText.isEmpty) {
-          return '';
-        }
+        if (bodyText.isEmpty) return '';
         final parsed = jsonDecode(bodyText) as Map<String, dynamic>;
         final reply = (parsed['reply'] ?? '').toString();
         final sessionValue = parsed['sessionId']?.toString();
@@ -428,71 +440,121 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         return reply;
       }
 
-      String replyBuffer = '';
+      // Parsing SSE stream
       final lineStream = response.stream
         .transform(utf8.decoder)
         .transform(const LineSplitter());
 
-      await for (final rawLine in lineStream) {
-        final trimmedLine = rawLine.trim();
-        if (trimmedLine.isEmpty) {
-          continue;
-        }
-        if (!trimmedLine.startsWith('data:')) {
-          continue;
-        }
-        final dataPayload = trimmedLine.substring(5).trim();
-        if (dataPayload.isEmpty) {
-          continue;
-        }
-        if (dataPayload == '[DONE]') {
-          break;
-        }
+      try {
+        await for (final rawLine in lineStream) {
+          final trimmedLine = rawLine.trim();
+          if (trimmedLine.isEmpty || !trimmedLine.startsWith('data:')) continue;
+          final dataPayload = trimmedLine.substring(5).trim();
+          if (dataPayload.isEmpty) continue;
+          if (dataPayload == '[DONE]') break;
 
-        Map<String, dynamic> payload;
-        try {
-          payload = jsonDecode(dataPayload) as Map<String, dynamic>;
-        } catch (_) {
-          continue;
-        }
+          Map<String, dynamic> payload;
+          try {
+            payload = jsonDecode(dataPayload) as Map<String, dynamic>;
+          } catch (_) {
+            continue;
+          }
 
-        final errorPayload = payload['error'];
-        if (errorPayload != null) {
-          throw Exception(errorPayload.toString());
-        }
+          final errorPayload = payload['error'];
+          if (errorPayload != null) throw Exception(errorPayload.toString());
 
-        final titleDelta = payload['titleDelta']?.toString();
-        if (titleDelta != null && titleDelta.isNotEmpty) {
-          _updateSessionTitleStream(titleDelta);
-        }
+          final titleDelta = payload['titleDelta']?.toString();
+          if (titleDelta != null && titleDelta.isNotEmpty) _updateSessionTitleStream(titleDelta);
 
-        final titleValue = payload['title']?.toString();
-        if (titleValue != null && titleValue.isNotEmpty) {
-          _updateSessionTitleFinal(titleValue);
-        }
+          final titleValue = payload['title']?.toString();
+          if (titleValue != null && titleValue.isNotEmpty) _updateSessionTitleFinal(titleValue);
 
-        final delta = payload['delta']?.toString();
-        if (delta != null && delta.isNotEmpty) {
-          replyBuffer += delta;
-          _updateAssistantMessage(assistantIndex, replyBuffer);
-        }
+          final delta = payload['delta']?.toString();
+          if (delta != null && delta.isNotEmpty) {
+            replyBuffer += delta;
+            _updateAssistantMessage(assistantIndex, replyBuffer);
+          }
 
-        final replyValue = payload['reply']?.toString();
-        if (replyValue != null && replyValue.isNotEmpty) {
-          replyBuffer = replyValue;
-          _updateAssistantMessage(assistantIndex, replyBuffer);
-        }
+          final replyValue = payload['reply']?.toString();
+          if (replyValue != null && replyValue.isNotEmpty) {
+            replyBuffer = replyValue;
+            _updateAssistantMessage(assistantIndex, replyBuffer);
+          }
 
-        final sessionValue = payload['sessionId']?.toString();
-        if (sessionValue != null && sessionValue.isNotEmpty) {
-          await _persistSessionId(sessionValue, skipFetch: true);
+          final sessionValue = payload['sessionId']?.toString();
+          if (sessionValue != null && sessionValue.isNotEmpty) {
+            await _persistSessionId(sessionValue, skipFetch: true);
+          }
         }
+      } on Exception catch (e) {
+        final errMsg = e.toString();
+        final isConnectionClosed = errMsg.contains('Connection closed') ||
+            errMsg.contains('ClientException') ||
+            errMsg.contains('SocketException') ||
+            errMsg.contains('Connection reset');
+
+        if (isConnectionClosed) {
+          // Koneksi putus — cek apakah sudah ada konten
+          if (replyBuffer.trim().isNotEmpty) {
+            // Sudah ada konten sebagian — tampilkan, jangan tampilkan error
+            throw _PartialStreamResult(replyBuffer);
+          }
+          // Belum ada konten — fallback ke non-stream endpoint
+          return await _fallbackNonStream(prompt: prompt, bodyJson: body);
+        }
+        rethrow;
       }
 
       return replyBuffer;
+    } on _PartialStreamResult {
+      rethrow; // Biarkan _sendMessage tangani
+    } on Exception catch (e) {
+      final errMsg = e.toString();
+      final isConnectionClosed = errMsg.contains('Connection closed') ||
+          errMsg.contains('ClientException') ||
+          errMsg.contains('SocketException') ||
+          errMsg.contains('Connection reset');
+
+      if (isConnectionClosed) {
+        if (replyBuffer.trim().isNotEmpty) {
+          throw _PartialStreamResult(replyBuffer);
+        }
+        // Fallback ke non-stream
+        return await _fallbackNonStream(prompt: prompt, bodyJson: body);
+      }
+      rethrow;
     } finally {
       client.close();
     }
+  }
+
+  /// Fallback endpoint non-stream: POST /chat (bukan /chat/stream)
+  /// Digunakan saat stream SSE gagal sebelum menghasilkan konten apapun.
+  Future<String> _fallbackNonStream({
+    required String prompt,
+    required String bodyJson,
+  }) async {
+    try {
+      final nonStreamUri = Uri.parse('${GlobalVar.baseUrl}/chat');
+      final response = await http.post(
+        nonStreamUri,
+        headers: {'Content-Type': 'application/json'},
+        body: bodyJson,
+      ).timeout(const Duration(seconds: 45));
+
+      if (response.statusCode == 200) {
+        final parsed = jsonDecode(response.body) as Map<String, dynamic>;
+        final reply = (parsed['reply'] ?? '').toString();
+        final sessionValue = parsed['sessionId']?.toString();
+        if (sessionValue != null && sessionValue.isNotEmpty) {
+          await _persistSessionId(sessionValue, skipFetch: true);
+        }
+        return reply;
+      }
+    } catch (_) {
+      // Jika fallback juga gagal, biarkan jatuh ke pesan error default
+    }
+    return _fallbackAssistantReply;
   }
 
   void _updateAssistantMessage(int index, String content) {
@@ -1151,3 +1213,12 @@ class _TextBlock {
 
   const _TextBlock(this.type, this.text, {this.prefix});
 }
+
+/// Exception khusus: koneksi stream putus tapi sudah ada konten sebagian.
+/// [partial] berisi teks yang sudah diterima sebelum koneksi terputus.
+/// Ini BUKAN error — digunakan untuk menampilkan jawaban parsial daripada pesan error.
+class _PartialStreamResult implements Exception {
+  final String partial;
+  const _PartialStreamResult(this.partial);
+}
+
