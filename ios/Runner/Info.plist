@@ -47,5 +47,36 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>http</string>
+			<string>https</string>
+			<string>mailto</string>
+			<string>tel</string>
+			<string>sms</string>
+		</array>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>This app requires access to the photo library to upload images for profile and assignments.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>This app requires access to the camera to take photos for assignments.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>This app requires access to the microphone for recording audio in assignments.</string>
+		<key>NSAppleMusicUsageDescription</key>
+		<string>This app requires access to files for assignments.</string>
+		<key>LSSupportsOpeningDocumentsInPlace</key>
+		<true/>
+		<key>UIFileSharingEnabled</key>
+		<true/>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>io.supabase.app</string>
+				</array>
+			</dict>
+		</array>
 	</dict>
 </plist>
