@@ -38,6 +38,35 @@ class UserService {
     }
   }
 
+  /// Mendapatkan papan peringkat mahasiswa berdasarkan Elo tertinggi.
+  /// Memanggil endpoint GET /user/leaderboard yang sudah di-sort server-side.
+  /// [limit] jumlah maksimal mahasiswa yang diambil (default 50).
+  static Future<List<Student>> getLeaderboard({
+    int limit = 50,
+    void Function(List<Student> freshData)? onRevalidated,
+  }) async {
+    try {
+      final uri = Uri.parse('${GlobalVar.baseUrl}/user/leaderboard?limit=$limit');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) return;
+          final freshResult = jsonDecode(freshResponse.body);
+          final freshStudents = List<Student>.from(
+            freshResult.map((u) => Student.fromJson(u)),
+          );
+          onRevalidated(freshStudents);
+        },
+      );
+      final result = jsonDecode(response.body);
+      return List<Student>.from(
+        result.map((u) => Student.fromJson(u)),
+      );
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
   static Future<Student> getUserById(
     int id, {
     void Function(Student freshData)? onRevalidated,

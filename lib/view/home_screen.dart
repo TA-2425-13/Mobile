@@ -243,9 +243,27 @@ class _HomeState extends State<Homescreen> {
 
   Future<void> getAllUser() async {
     try {
-      final result = await UserService.getAllUser().timeout(Duration(seconds: 10));
+      // Gunakan endpoint /user/leaderboard — sudah di-sort Elo desc & filter STUDENT di server
+      final result = await UserService.getLeaderboard(
+        onRevalidated: (freshData) {
+          if (!mounted) return;
+          setState(() {
+            list = freshData;
+          });
+          // Hitung ulang rank setelah revalidasi
+          for (int i = 0; i < list.length; i++) {
+            if (list[i].id == idUser) {
+              setState(() {
+                rank = list[i].rank ?? (i + 1);
+              });
+              break;
+            }
+          }
+        },
+      ).timeout(Duration(seconds: 10));
+
       setState(() {
-        list = sortUserByElo(studentRole(result));
+        list = result;
       });
 
       if (idUser == 0) return;
@@ -253,7 +271,7 @@ class _HomeState extends State<Homescreen> {
       for (int i = 0; i < list.length; i++) {
         if (list[i].id == idUser) {
           setState(() {
-            rank = i + 1;
+            rank = list[i].rank ?? (i + 1);
           });
           break;
         }

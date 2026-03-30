@@ -13,6 +13,7 @@ class Student {
   String? instructorId;
   int? instructorCourses;
   String? image;
+  int? rank; // Field tambahan dari endpoint /user/leaderboard
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -32,6 +33,7 @@ class Student {
     this.instructorId,
     this.instructorCourses,
     this.image,
+    this.rank,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -52,6 +54,7 @@ class Student {
       instructorId: json['instructorId'],
       instructorCourses: json['instructorCourses'],
       image: json['image'],
+      rank: json['rank'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
     );

@@ -25,16 +25,20 @@ class _FriendsScreen extends State<FriendsScreen> {
     return sorted;
   }
 
-  List<Student> studentRole(List<Student> list) {
-    return list.where((user) => user.role == 'STUDENT').toList();
-  }
-
   void getAllUser() async {
     try {
-      final result = await UserService.getAllUser();
+      // Gunakan endpoint /user/leaderboard — sudah di-sort Elo desc & filter STUDENT di server
+      final result = await UserService.getLeaderboard(
+        onRevalidated: (freshData) {
+          if (!mounted) return;
+          setState(() {
+            user = freshData;
+          });
+        },
+      );
       if (!mounted) return;
       setState(() {
-        user = sortUserByElo(studentRole(result));
+        user = result;
       });
     } catch (_) {
       if (!mounted) return;
