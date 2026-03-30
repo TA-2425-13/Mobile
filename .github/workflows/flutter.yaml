@@ -6,9 +6,8 @@ on:
       - main
 
 jobs:
-  build:
+  android-build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -22,7 +21,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.35.4
           channel: 'stable'
           cache: true
 
@@ -30,7 +28,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r27d # Note: Using the exact version 27.0.12077973 from your logs
+          ndk-version: r27d
           add-to-path: false
 
       - name: Fix CMake Permissions for Cache
@@ -109,12 +107,36 @@ jobs:
         if: steps.aab_upload.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab
+          name: android-release-aab
           path: build/app/outputs/bundle/release/app-release.aab
 
       - name: Upload APK artifact
         if: steps.aab_upload.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: android-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+  ios-build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS (No Codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload iOS Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: build/ios/iphoneos/Runner.app
