@@ -19,7 +19,6 @@ import '../model/user.dart';
 import '../service/course_service.dart';
 import '../utils/colors.dart';
 import 'login_screen.dart';
-import '../service/evaluation_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final bool isActive;
@@ -258,7 +257,6 @@ class _ProfileState extends State<ProfileScreen> {
   }
 
   Future<void> logout() async {
-    await EvaluationService.endSession();
     await prefs.remove('userId');
     await prefs.remove('name');
     await prefs.remove('role');
