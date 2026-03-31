@@ -6,6 +6,8 @@ class UserCourse {
   int currentChapter;
   bool isCompleted;
   DateTime enrolledAt;
+  // Field opsional dari backend (elo rating kursus)
+  int elo;
 
   UserCourse({
     required this.id,
@@ -15,17 +17,36 @@ class UserCourse {
     required this.currentChapter,
     required this.isCompleted,
     required this.enrolledAt,
+    this.elo = 750,
   });
 
   factory UserCourse.fromJson(Map<String, dynamic> json) {
+    // Helper: parse int dengan aman dari num/double/int/String
+    int safeInt(dynamic v, [int fallback = 0]) {
+      if (v == null) return fallback;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString()) ?? fallback;
+    }
+
+    DateTime safeDate(dynamic v) {
+      if (v == null) return DateTime.now();
+      try {
+        return DateTime.parse(v.toString());
+      } catch (_) {
+        return DateTime.now();
+      }
+    }
+
     return UserCourse(
-      id: json['id'],
-      userId: json['userId'],
-      courseId: json['courseId'],
-      progress: json['progress'],
-      currentChapter: json['currentChapter'],
-      isCompleted: json['isCompleted'],
-      enrolledAt: DateTime.parse(json['enrolledAt']),
+      id: safeInt(json['id']),
+      userId: safeInt(json['userId']),
+      courseId: safeInt(json['courseId']),
+      progress: safeInt(json['progress']),
+      currentChapter: safeInt(json['currentChapter'], 1),
+      isCompleted: json['isCompleted'] == true,
+      enrolledAt: safeDate(json['enrolledAt']),
+      elo: safeInt(json['elo'], 750),
     );
   }
 }
