@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:app/model/chapter.dart';
 import 'package:app/model/chapter_status.dart';
+import 'package:app/service/api_cache_service.dart';
 import 'package:app/service/badge_service.dart';
 import 'package:app/service/chapter_service.dart';
 import 'package:app/service/course_service.dart';
@@ -11,6 +12,7 @@ import 'package:app/service/user_service.dart';
 import 'package:flutter/material.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 
 import 'package:app/model/badge.dart';
 import 'package:app/model/course.dart';
@@ -752,11 +754,26 @@ class _CourseDetail extends State<CourseDetailScreen> {
                 );
 
                 if (result != null) {
-                  setState(() {
-                    listChapter[result['index']].status =
-                        ChapterStatus.fromJson(result['status']);
-                  });
+                  final returnedIndex = result['index'] as int?;
+                  final returnedStatus = result['status'];
+                  if (returnedIndex != null && returnedStatus != null) {
+                    setState(() {
+                      listChapter[returnedIndex].status =
+                          ChapterStatus.fromJson(returnedStatus as Map<String, dynamic>);
+                    });
+                  }
+
+                  // Force-refresh dari server agar status assessmentDone ter-update
+                  // dan chapter berikutnya tidak tetap "locked" (chapter ngulang).
+                  // Invalidasi SWR cache untuk chapter & userCourse terlebih dahulu.
+                  if (idCourse != 0) {
+                    await ApiCacheService.clearCacheContaining('chapter');
+                    await ApiCacheService.clearCacheContaining('userchapter');
+                  }
+                  unawaited(getChapter(idCourse));
+                  unawaited(getUserCourse());
                 }
+
               },
               child: Padding(
                 padding: const EdgeInsets.only(
