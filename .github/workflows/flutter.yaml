@@ -78,24 +78,10 @@ jobs:
           echo "keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}" >> android/key.properties
 
-      - name: Build AAB
-        run: flutter build appbundle --release
-
       - name: Build APK (Fallback)
         run: flutter build apk --release
 
-      - name: Attempt AAB Upload to Firebase
-        id: aab_upload
-        uses: wzieba/Firebase-Distribution-Github-Action@v1
-        continue-on-error: true
-        with:
-          appId: 1:647460537786:android:e525a74d6979a72ca98983
-          token: ${{ secrets.FIREBASE_TOKEN }}
-          groups: testers, #students
-          file: build/app/outputs/bundle/release/app-release.aab
-
-      - name: Fallback to APK Upload
-        if: steps.aab_upload.outcome == 'failure'
+      - name: APK Upload
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: 1:647460537786:android:e525a74d6979a72ca98983
@@ -103,15 +89,7 @@ jobs:
           groups: testers, #students
           file: build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Upload AAB artifact
-        if: steps.aab_upload.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-aab
-          path: build/app/outputs/bundle/release/app-release.aab
-
       - name: Upload APK artifact
-        if: steps.aab_upload.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: android-release-apk
