@@ -78,7 +78,7 @@ jobs:
           echo "keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}" >> android/key.properties
 
-      - name: Build APK (Fallback)
+      - name: Build APK
         run: flutter build apk --release
 
       - name: APK Upload
