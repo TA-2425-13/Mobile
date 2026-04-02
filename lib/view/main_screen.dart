@@ -282,7 +282,7 @@ class _MainState extends State<Mainscreen> {
   Widget _buildPage(int index) {
     switch (index) {
       case 0:
-        return Homescreen(
+        return HomeScreen(
           updateIndex: updateIndex,
           onReplayTutorial: _restartTutorialFromHome,
         );
@@ -300,7 +300,7 @@ class _MainState extends State<Mainscreen> {
           onSubTutorialCompleted: _onProfileEloTutorialCompleted,
         );
       default:
-        return Homescreen(
+        return HomeScreen(
           updateIndex: updateIndex,
           onReplayTutorial: _restartTutorialFromHome,
         );

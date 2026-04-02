@@ -9,7 +9,7 @@ import 'package:app/service/user_service.dart';
 import 'package:app/view/about_app.dart';
 import 'package:app/view/quick_access_screen.dart';
 import 'package:app/view/trade_screen.dart';
-import 'package:app/view/update_profile_screeen.dart';
+import 'package:app/view/update_profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';

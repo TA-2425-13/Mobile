@@ -15,21 +15,23 @@ import '../utils/colors.dart';
 import 'chatbot_screen.dart';
 import 'login_screen.dart';
 
-class Homescreen extends StatefulWidget {
+import 'package:app/view/chatbot_response_rating.dart';
+
+class HomeScreen extends StatefulWidget {
   final Function(int) updateIndex;
   final VoidCallback onReplayTutorial;
 
-  const Homescreen({
+  const HomeScreen({
     super.key,
     required this.updateIndex,
     required this.onReplayTutorial,
   });
 
   @override
-  State<Homescreen> createState() => _HomeState();
+  State<HomeScreen> createState() => _HomeState();
 }
 
-class _HomeState extends State<Homescreen> {
+class _HomeState extends State<HomeScreen> {
   static final Map<int, List<Course>> _enrolledCache = {};
   static final Map<int, Student> _userCache = {};
 
@@ -116,6 +118,13 @@ class _HomeState extends State<Homescreen> {
     if (selected == 'start' && mounted) {
       widget.onReplayTutorial();
     }
+  }
+
+  void _showInfoPopup() {
+    showDialog(
+      context: context,
+      builder: (context) => const ChatbotResponseRating(),
+    );
   }
 
   void _applyLatestSelectedCourseFromPrefs() {
@@ -242,18 +251,19 @@ class _HomeState extends State<Homescreen> {
 
   Future<void> getAllUser() async {
     try {
-      // Gunakan endpoint /user/leaderboard — sudah di-sort Elo desc & filter STUDENT di server
-      final result = await UserService.getLeaderboard(
+      // Use getAllUser() to get the full list for accurate ranking (e.g. / 59 instead of / 50)
+      final result = await UserService.getAllUser(
         onRevalidated: (freshData) {
           if (!mounted) return;
+          final filtered = sortUserByElo(studentRole(freshData));
           setState(() {
-            list = freshData;
+            list = filtered;
           });
-          // Hitung ulang rank setelah revalidasi
+          // Recalculate rank after revalidation
           for (int i = 0; i < list.length; i++) {
             if (list[i].id == idUser) {
               setState(() {
-                rank = list[i].rank ?? (i + 1);
+                rank = i + 1;
               });
               break;
             }
@@ -261,8 +271,9 @@ class _HomeState extends State<Homescreen> {
         },
       ).timeout(Duration(seconds: 10));
 
+      final filtered = sortUserByElo(studentRole(result));
       setState(() {
-        list = result;
+        list = filtered;
       });
 
       if (idUser == 0) return;
@@ -270,7 +281,7 @@ class _HomeState extends State<Homescreen> {
       for (int i = 0; i < list.length; i++) {
         if (list[i].id == idUser) {
           setState(() {
-            rank = list[i].rank ?? (i + 1);
+            rank = i + 1;
           });
           break;
         }
@@ -439,7 +450,7 @@ class _HomeState extends State<Homescreen> {
                               child: Text('Log Out', style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: AppColors.primaryColor)),
                             )
                           ],
-                        )
+                        ),
                       ],
                     ),
                   ),
@@ -743,6 +754,14 @@ class _HomeState extends State<Homescreen> {
                   color: AppColors.primaryColor,
                 ),
               ),
+              IconButton(
+                tooltip: 'Informasi',
+                onPressed: _showInfoPopup,
+                icon: const Icon(
+                  Icons.info_outline,
+                  color: AppColors.primaryColor,
+                ),
+              ),
               const SizedBox(width: 4),
               GestureDetector(
                 onTap: () => widget.updateIndex(4),
@@ -864,16 +883,22 @@ class _HomeState extends State<Homescreen> {
                 children: [
                   Row(
                     mainAxisAlignment:
-                    MainAxisAlignment.start,
+                    MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildInfoColumn(
-                          LineAwesomeIcons.medal_solid, 'Lencana', '${userBadges?.length ?? 0}', AppColors.accentColor),
-                      SizedBox(width: 24),
-                      _buildInfoColumn(
-                          LineAwesomeIcons.user_check_solid, 'Course', '${allCourses.isNotEmpty ? allCourses.length : 0}', AppColors.accentColor),
-                      SizedBox(width: 24),
-                      _buildInfoColumn(
-                          LineAwesomeIcons.trophy_solid, 'Peringkat', '$rank / ${list.length}', AppColors.accentColor),
+                      Expanded(
+                        child: _buildInfoColumn(
+                            LineAwesomeIcons.medal_solid, 'Lencana', '${userBadges?.length ?? 0}', AppColors.accentColor),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildInfoColumn(
+                            LineAwesomeIcons.user_check_solid, 'Course', '${allCourses.isNotEmpty ? allCourses.length : 0}', AppColors.accentColor),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildInfoColumn(
+                            LineAwesomeIcons.trophy_solid, 'Peringkat', '$rank / ${list.length}', AppColors.accentColor),
+                      ),
                     ],
                   ),
                   SizedBox(height: 24),
@@ -943,30 +968,36 @@ class _HomeState extends State<Homescreen> {
           size: 24,  // Ukuran icon
         ),
         SizedBox(width: 4),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label, // Teks yang ingin ditampilkan
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium!
-                  .copyWith(
-                // fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontFamily:
-                'DIN_Next_Rounded', // Ganti dengan font yang diinginkan
-              ),
-            ),
-            Text(value,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label, // Teks yang ingin ditampilkan
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context)
                     .textTheme
-                    .titleMedium!
+                    .labelMedium!
                     .copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontFamily: 'DIN_Next_Rounded'))
-          ],
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily:
+                  'DIN_Next_Rounded', // Ganti dengan font yang diinginkan
+                ),
+              ),
+              Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium!
+                      .copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: 'DIN_Next_Rounded'))
+            ],
+          ),
         )// Jarak antara icon dan text
       ],
     );
