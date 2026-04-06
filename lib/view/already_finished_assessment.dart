@@ -6,16 +6,19 @@ import 'package:app/model/chapter_status.dart';
 import 'package:app/model/user.dart';
 import 'package:app/service/chapter_service.dart';
 import 'package:app/utils/colors.dart';
+import 'package:app/view/questionnaire_screen.dart';
 
 class AlreadyFinishedAssessmentAssessmentScreen extends StatefulWidget {
   final ChapterStatus status;
   final Student user;
   final Function(ChapterStatus)? updateStatus;
+  final int? level;
   const AlreadyFinishedAssessmentAssessmentScreen({
     super.key,
     required this.status,
     required this.user,
     this.updateStatus,
+    this.level,
   });
 
   @override
@@ -122,6 +125,21 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: child,
+      floatingActionButton: widget.level == 8
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const QuestionnaireScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.assignment, color: Colors.white),
+              label: const Text('Isi Kuesioner', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)),
+              backgroundColor: AppColors.primaryColor,
+            )
+          : null,
     );
   }
 

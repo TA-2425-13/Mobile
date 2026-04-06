@@ -11,6 +11,7 @@ import 'package:app/service/user_chapter_service.dart';
 import 'package:app/service/user_course_service.dart';
 import 'package:app/service/user_service.dart';
 import 'package:app/utils/colors.dart';
+import 'package:app/view/questionnaire_screen.dart';
 
 class AssessmentScreen extends StatefulWidget {
   final ChapterStatus status;
@@ -778,8 +779,10 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
   Widget _buildResultView() {
     final objectiveTotal =
         _servedQuestions.where((q) => q.type.toUpperCase() != 'EY').length;
-    return Container(
-      decoration: const BoxDecoration(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage('lib/assets/pictures/background-pattern.png'),
           fit: BoxFit.cover,
@@ -849,6 +852,22 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           ],
         ),
       ),
+      ),
+      floatingActionButton: widget.level == 8
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const QuestionnaireScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.assignment, color: Colors.white),
+              label: const Text('Isi Kuesioner', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)),
+              backgroundColor: AppColors.primaryColor,
+            )
+          : null,
     );
   }
 }

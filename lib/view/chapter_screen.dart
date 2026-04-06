@@ -145,7 +145,8 @@ class _ChapterScreenState extends State<Chapterscreen>
                   ? AlreadyFinishedAssessmentAssessmentScreen(
                       status: widget.status,
                       user: widget.user,
-                      updateStatus: updateStatus)
+                      updateStatus: updateStatus,
+                      level: widget.level)
                   : AssessmentScreen(
                       status: widget.status,
                       user: widget.user,
