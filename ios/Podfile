@@ -1,41 +1,39 @@
 # Uncomment this line to define a global platform for your project
-# platform :ios, '12.0'
+# platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
-ENV['COCOAPODS_DISABLE_STATS'] = '1'
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
   'Debug' => :debug,
+  'Profile' => :release,
   'Release' => :release,
-  'Profile' => :profile,
 }
 
-def flutter_install_all_ios_pods(ios_application_path = nil)
-  native_additions_path = File.join(ios_application_path, 'Flutter', 'flutter_export_environment.sh')
-  return unless File.exist?(native_additions_path)
-
-  # This logic is adapted from the Flutter tool to read the environment variables
-  # exported by the Flutter tool.
-  File.foreach(native_additions_path) do |line|
-    matches = line.match(/\Aexport\s+(.+)=(.*)\z/)
-    next unless matches
-    key = matches[1]
-    value = matches[2].gsub(/\A"(.*)"\z/, '\1')
-    ENV[key] = value
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
   end
 
-  # The Flutter tool creates this file. If it doesn't exist, it's possible that
-  # `flutter pub get` hasn't been run yet.
-  podhelper_path = File.join(File.expand_path(File.dirname(__FILE__)), 'Flutter', 'podhelper.rb')
-  require podhelper_path
-  install_all_flutter_pods(ios_application_path)
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
 end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks!
-  use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
 end
 
 post_install do |installer|
