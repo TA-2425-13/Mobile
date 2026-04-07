@@ -4,11 +4,27 @@ import 'package:app/global_var.dart';
 import 'package:app/model/trade.dart';
 import 'package:app/model/user_trade.dart';
 import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 
 class TradeService {
-  static Future<List<TradeModel>> getAllTrades() async {
+  static Future<List<TradeModel>> getAllTrades({
+    void Function(List<TradeModel> freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/trade'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/trade');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          final freshTrades = List<TradeModel>.from(
+            freshResult.map((item) => TradeModel.fromJson(item)),
+          );
+          onRevalidated(freshTrades);
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       List<TradeModel> trades = List<TradeModel>.from(
@@ -41,10 +57,26 @@ class TradeService {
     }
   }
 
-  static Future<List<UserTrade>> getUserTrade(int userId) async{
+  static Future<List<UserTrade>> getUserTrade(
+    int userId, {
+    void Function(List<UserTrade> freshData)? onRevalidated,
+  }) async{
     try {
       List<UserTrade> filteredUserTrade = [];
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/usertrade'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/usertrade');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          final freshTrades = List<UserTrade>.from(
+            freshResult.map((item) => UserTrade.fromJson(item)),
+          ).where((trade) => trade.userId == userId).toList();
+          onRevalidated(freshTrades);
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       List<UserTrade> trades = List<UserTrade>.from(

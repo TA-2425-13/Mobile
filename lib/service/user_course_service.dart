@@ -1,15 +1,32 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 
 import '../global_var.dart';
 import '../model/user_course.dart';
 
 class UserCourseService {
 
-  static Future<UserCourse> getUserCourse(int idUser, int idCourse) async {
+  static Future<UserCourse> getUserCourse(
+    int idUser,
+    int idCourse, {
+    void Function(UserCourse freshData)? onRevalidated,
+  }) async {
     try {
       late UserCourse status;
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/usercourse/$idUser/$idCourse'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/usercourse/$idUser/$idCourse');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          if (freshResult is List && freshResult.isNotEmpty) {
+            onRevalidated(UserCourse.fromJson(freshResult[0]));
+          }
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       print(result);
@@ -38,6 +55,8 @@ class UserCourseService {
       }, body: jsonEncode(request));
 
       if (responsePut.statusCode == 200) {
+        await ApiCacheService.clearCacheContaining('/user/${uc.userId}/courses');
+        await ApiCacheService.clearCacheContaining('/usercourse/${uc.userId}/${uc.courseId}');
         print("Update Successful");
       }
     } catch(e){

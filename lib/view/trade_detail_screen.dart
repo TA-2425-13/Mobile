@@ -8,7 +8,6 @@ import 'package:app/view/whatadeal_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:lottie/lottie.dart';
 
 import '../model/user.dart';
 import '../service/user_service.dart';
@@ -49,7 +48,15 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
       int? id = pref.getInt('userId');
       if (id == null) return;
 
-      final result = await BadgeService.getUserBadgeListByUserId(id);
+      final result = await BadgeService.getUserBadgeListByUserId(
+        id,
+        onRevalidated: (freshBadges) {
+          if (!mounted) return;
+          setState(() {
+            userBadges = freshBadges;
+          });
+        },
+      );
       if (!mounted) return;
 
       setState(() {
@@ -66,7 +73,15 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
       int? id = pref.getInt('userId');
       if (id == null) return;
 
-      final result = await BadgeService.getUserBadgeListWithStatusByUserId(id);
+      final result = await BadgeService.getUserBadgeListWithStatusByUserId(
+        id,
+        onRevalidated: (freshBadges) {
+          if (!mounted) return;
+          setState(() {
+            userBadgesWithStatus = freshBadges;
+          });
+        },
+      );
       if (!mounted) return;
 
       setState(() {
@@ -202,13 +217,41 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Pointku : ${user?.points != null ? user!.points : 0}", style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'DIN_Next_Rounded',
-                ),),
+                Row(
+                  children: [
+                    Text("Pointku : ${user?.points ?? 0} ", style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'DIN_Next_Rounded',
+                    ),),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        user?.eloTitle ?? 'Beginner',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                          fontFamily: 'DIN_Next_Rounded'
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 SizedBox(height: 12,),
-                ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.network(widget.trade.image)),
+                ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: widget.trade.image.toLowerCase().startsWith('http')
+                    ? Image.network(
+                      widget.trade.image,
+                      errorBuilder: (context, error, stackTrace) => Image.asset('lib/assets/pictures/icon.png'),
+                      )
+                        : Image.asset(widget.trade.image)
+                ),
                 SizedBox(height: 16),
                 Text(
                   widget.trade.title,
@@ -236,7 +279,7 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
                   ),
                 ),
                 Text(
-                  'Tukarkan satu buah badge dengan tipe ${widget.trade.requiredBadgeType} dan tukarkan point sebanyak ${reqPoint} untuk mendapatkan penawaran ini!',
+                  'Tukarkan satu buah badge dengan tipe ${widget.trade.requiredBadgeType} dan tukarkan point sebanyak $reqPoint untuk mendapatkan penawaran ini!',
                   style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                 ),
                 SizedBox(height: 16),
@@ -342,7 +385,18 @@ class _TradeDetailScreenState extends State<TradeDetailScreen> {
               // 📌 Trade Details
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(widget.trade.image, height: 180, fit: BoxFit.cover),
+                child: widget.trade.image.toLowerCase().startsWith('http')
+                    ? Image.network(
+                        widget.trade.image,
+                        height: 180,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Image.asset(
+                          'lib/assets/pictures/icon.png',
+                          height: 180,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Image.asset(widget.trade.image, height: 180, fit: BoxFit.cover),
               ),
               const SizedBox(height: 16),
 

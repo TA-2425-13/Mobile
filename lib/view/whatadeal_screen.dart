@@ -63,7 +63,7 @@ class _WhatADealScreenState extends State<WhatADealScreen> {
                       onPressed: () {
                         Navigator.pop(context);
                       },
-                      style: ButtonStyle(backgroundColor: MaterialStateProperty.all<Color>(AppColors.primaryColor)),
+                      style: ButtonStyle(backgroundColor: WidgetStateProperty.all<Color>(AppColors.primaryColor)),
                       child: Text("Ayo, dapatkan lebih banyak badge!", style: TextStyle(fontSize: 16, color: Colors.white, fontFamily: 'DIN_Next_Rounded')),
                     ),
                 ],

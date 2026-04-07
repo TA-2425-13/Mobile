@@ -32,20 +32,24 @@ class Assessment {
 }
 
 class Question {
+  int? id;
   String question;
   List<String> option;
   String correctedAnswer;
   String type;
+  int elo;
   String _selectedAnswer = '';
   int score = 0;
   List<String> _selectedMultiAnswer = [];
   bool isCorrect = false;
 
   Question({
+    this.id,
     required this.question,
     required this.option,
     required this.correctedAnswer,
-    required this.type
+    required this.type,
+    this.elo = 1200,
   });
 
   String get selectedAnswer => _selectedAnswer;
@@ -57,9 +61,4 @@ class Question {
   set selectedMultiAnswer(List<String> list) {
     _selectedMultiAnswer = list;
   }
-
-
-
-
-
 }

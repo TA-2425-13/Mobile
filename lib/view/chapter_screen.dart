@@ -8,6 +8,7 @@ import 'package:app/view/material_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../model/user.dart';
+import '../service/chapter_service.dart';
 import 'custom_tab_indicator.dart';
 
 class Chapterscreen extends StatefulWidget {
@@ -35,7 +36,8 @@ class Chapterscreen extends StatefulWidget {
   State<Chapterscreen> createState() => _ChapterScreenState();
 }
 
-class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateMixin {
+class _ChapterScreenState extends State<Chapterscreen>
+    with TickerProviderStateMixin {
   Student? user;
   late TabController _tabController;
   int _currentIndex = 0;
@@ -45,6 +47,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
   bool _materialLocked = false;
   bool _assessmentStarted = false;
   bool _assessmentFinished = false;
+  bool _prefetchTriggered = false;
 
   @override
   void initState() {
@@ -58,6 +61,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
         _currentIndex = _tabController.index;
       });
     });
+    _prefetchAttemptInBackground();
   }
 
   @override
@@ -68,20 +72,44 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
 
   void updateProgress(bool value) {
     setState(() {
-      materialComplete = true;// Update progress in real-time
+      materialComplete = true; // Update progress in real-time
+      _screens[1] = null;
     });
-    print("Material complete : $materialComplete");
+  }
+
+  Future<void> _prefetchAttemptInBackground() async {
+    if (_prefetchTriggered) {
+      return;
+    }
+    if (widget.status.assessmentDone) {
+      return;
+    }
+
+    _prefetchTriggered = true;
+
+    try {
+      await ChapterService.warmupAssessmentAttempt(
+        widget.status.chapterId,
+        widget.user.id,
+      );
+    } catch (error) {
+      // Silent fail. User can still start and backend will generate on start.
+      debugPrint('Prefetch attempt failed: $error');
+    }
   }
 
   void updateStatus(ChapterStatus value) {
     setState(() {
       status = value; // Update progress in real-time
+      _screens[1] = null;
+      _screens[2] = null;
     });
   }
 
   void updateMaterialLocked(bool value) {
     setState(() {
       _materialLocked = value; // Update progress in real-time
+      _screens[0] = null;
     });
   }
 
@@ -94,6 +122,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
   void updateAssessmentFinished(bool value) {
     setState(() {
       _assessmentFinished = value; // Update progress in real-time
+      _screens[2] = null;
     });
   }
 
@@ -103,20 +132,50 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
         case 0:
           _screens[index] = _materialLocked
               ? _lockedMaterialContent()
-              : MaterialScreen(status: widget.status, chapterName: widget.chapterName, updateProgress: updateProgress, updateStatus: updateStatus,);
+              : MaterialScreen(
+                  status: widget.status,
+                  chapterName: widget.chapterName,
+                  updateProgress: updateProgress,
+                  updateStatus: updateStatus,
+                );
           break;
         case 1:
-          print('$materialComplete awoooooo');
           _screens[index] = materialComplete
               ? widget.status.assessmentDone
-              ? AlreadyFinishedAssessmentAssessmentScreen(status: widget.status, user: widget.user)
-              : AssessmentScreen(status: widget.status, user: widget.user, updateMaterialLocked: updateMaterialLocked, updateStatus: updateStatus, updateAssessmentFinished: updateAssessmentFinished, updateAssessmentStarted: updateAssessmentStarted,)
+                  ? AlreadyFinishedAssessmentAssessmentScreen(
+                      status: widget.status,
+                      user: widget.user,
+                      updateStatus: updateStatus,
+                      level: widget.level)
+                  : AssessmentScreen(
+                      status: widget.status,
+                      user: widget.user,
+                      courseId: widget.uc.courseId,
+                      level: widget.level,
+                      chapterName: widget.chapterName,
+                      uc: widget.uc,
+                      chLength: widget.chLength,
+                      updateMaterialLocked: updateMaterialLocked,
+                      updateStatus: updateStatus,
+                      updateAssessmentFinished: updateAssessmentFinished,
+                      updateAssessmentStarted: updateAssessmentStarted,
+                    )
               : _lockedContent();
           break;
         case 2:
-          _screens[index] = widget.status.assessmentDone || _assessmentFinished ?
-              AssignmentScreen(status: status, user: widget.user, uc: widget.uc, level: widget.level, chLength: widget.chLength, idBadge: widget.idBadge, updateProgress: updateProgress, updateStatus: updateStatus) :
-              _lockedAssignmentContent();
+          _screens[index] = widget.status.assessmentDone || _assessmentFinished
+              ? AssignmentScreen(
+                  status: status,
+                  user: widget.user,
+                  uc: widget.uc,
+                  level: widget.level,
+                  chapterName: widget.chapterName,
+                  chLength: widget.chLength,
+                  idBadge: widget.idBadge,
+                  updateProgress: updateProgress,
+                  updateStatus: updateStatus,
+                )
+              : _lockedAssignmentContent();
           break;
       }
     }
@@ -127,18 +186,19 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
   Widget build(BuildContext context) {
     return WillPopScope(
         onWillPop: () async {
-          Navigator.pop(context, {
-            'status': status.toJson(),
-            'index': widget.chapterIndexInList
-          }
-          );
+          Navigator.pop(context,
+              {'status': status.toJson(), 'index': widget.chapterIndexInList});
           return true;
         },
         child: Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
             backgroundColor: AppColors.primaryColor,
-            title: Text(widget.chapterName, style: TextStyle(color: Colors.white, fontSize: 18, fontFamily: 'DIN_Next_Rounded')),
+            title: Text(widget.chapterName,
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontFamily: 'DIN_Next_Rounded')),
             centerTitle: true,
           ),
           body: Column(
@@ -146,14 +206,20 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
               Material(
                 color: Colors.white,
                 child: IgnorePointer(
-                  ignoring: _assessmentStarted && !_assessmentFinished, // Disable interaction when assessment is active
+                  ignoring: _assessmentStarted &&
+                      !_assessmentFinished, // Disable interaction when assessment is active
                   child: TabBar(
                     controller: _tabController,
-                    indicator: CustomTabIndicator(color: AppColors.primaryColor),
+                    indicator:
+                        CustomTabIndicator(color: AppColors.primaryColor),
                     labelColor: AppColors.primaryColor,
                     unselectedLabelColor: Colors.grey.shade400,
-                    labelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded'),
-                    unselectedLabelStyle: TextStyle(fontSize: 14, fontFamily: 'DIN_Next_Rounded'),
+                    labelStyle: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'DIN_Next_Rounded'),
+                    unselectedLabelStyle:
+                        TextStyle(fontSize: 14, fontFamily: 'DIN_Next_Rounded'),
                     onTap: (index) {
                       if (_assessmentStarted && !_assessmentFinished) {
                         return; // Prevent tab switch
@@ -175,17 +241,14 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
               ),
             ],
           ),
-        )
-    );
+        ));
   }
 
   Widget _lockedContent() {
     return Container(
       decoration: BoxDecoration(
         image: DecorationImage(
-          image: AssetImage(
-              'lib/assets/pictures/background-pattern.png'
-          ),
+          image: AssetImage('lib/assets/pictures/background-pattern.png'),
           fit: BoxFit.cover,
         ),
       ),
@@ -199,8 +262,13 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
               SizedBox(height: 16),
               Text(
                 "Assessment Terkunci",
-                style: TextStyle(fontSize: 16, color: AppColors.primaryColor, fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold),
-              ),Text(
+                style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.primaryColor,
+                    fontFamily: 'DIN_Next_Rounded',
+                    fontWeight: FontWeight.bold),
+              ),
+              Text(
                 "Selesaikan materi terlebih dahulu untuk membuka Assessment!",
                 style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                 textAlign: TextAlign.center,
@@ -251,9 +319,7 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
     return Container(
       decoration: BoxDecoration(
         image: DecorationImage(
-          image: AssetImage(
-              'lib/assets/pictures/background-pattern.png'
-          ),
+          image: AssetImage('lib/assets/pictures/background-pattern.png'),
           fit: BoxFit.cover,
         ),
       ),
@@ -267,7 +333,11 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
               SizedBox(height: 16),
               Text(
                 "Assignment Terkunci",
-                style: TextStyle(fontSize: 16, color: AppColors.primaryColor, fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.primaryColor,
+                    fontFamily: 'DIN_Next_Rounded',
+                    fontWeight: FontWeight.bold),
               ),
               Text(
                 "Selesaikan Assessment terlebih dahulu untuk membuka Assignment!",
@@ -280,5 +350,4 @@ class _ChapterScreenState extends State<Chapterscreen> with TickerProviderStateM
       ),
     );
   }
-
 }

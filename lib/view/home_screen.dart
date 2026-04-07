@@ -12,18 +12,28 @@ import '../service/badge_service.dart';
 import '../service/course_service.dart';
 import '../service/user_service.dart';
 import '../utils/colors.dart';
+import 'chatbot_screen.dart';
 import 'login_screen.dart';
-import 'main_screen.dart';
 
-class Homescreen extends StatefulWidget {
+import 'package:app/view/chatbot_response_rating.dart';
+
+class HomeScreen extends StatefulWidget {
   final Function(int) updateIndex;
-  const Homescreen({super.key, required this.updateIndex});
+  final VoidCallback onReplayTutorial;
+
+  const HomeScreen({
+    super.key,
+    required this.updateIndex,
+    required this.onReplayTutorial,
+  });
 
   @override
-  State<Homescreen> createState() => _HomeState();
+  State<HomeScreen> createState() => _HomeState();
 }
 
-class _HomeState extends State<Homescreen> {
+class _HomeState extends State<HomeScreen> {
+  static final Map<int, List<Course>> _enrolledCache = {};
+  static final Map<int, Student> _userCache = {};
 
   List<Course> allCourses = [];
   double progress = 0.88;
@@ -36,38 +46,176 @@ class _HomeState extends State<Homescreen> {
   int rank = 0;
   int idUser = 0;
   List<UserBadge>? userBadges = [];
+  bool _isFetchingEnrolled = false;
+  final GlobalKey _tutorialButtonKey = GlobalKey();
+
+  Future<void> _showReplayTutorialPopup() async {
+    final buttonContext = _tutorialButtonKey.currentContext;
+    if (buttonContext == null) return;
+
+    final buttonBox = buttonContext.findRenderObject() as RenderBox;
+    final overlayBox = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final topLeft = buttonBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final bottomRight = buttonBox.localToGlobal(
+      buttonBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
+    );
+
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        overlayBox.size.width - bottomRight.dx,
+        bottomRight.dy + 8,
+        topLeft.dx,
+        overlayBox.size.height - topLeft.dy,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      items: [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: SizedBox(
+            width: 220,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Ulangi tutorial?',
+                  style: TextStyle(
+                    fontFamily: 'DIN_Next_Rounded',
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryColor,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Lihat lagi panduan fitur utama LeveLearn dari awal.',
+                  style: TextStyle(
+                    fontFamily: 'DIN_Next_Rounded',
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const PopupMenuDivider(height: 1),
+        const PopupMenuItem<String>(
+          value: 'start',
+          child: Row(
+            children: [
+              Icon(Icons.replay_rounded, size: 18, color: AppColors.primaryColor),
+              SizedBox(width: 8),
+              Text(
+                'Mulai ulang tutorial',
+                style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (selected == 'start' && mounted) {
+      widget.onReplayTutorial();
+    }
+  }
+
+  void _showInfoPopup() {
+    showDialog(
+      context: context,
+      builder: (context) => const ChatbotResponseRating(),
+    );
+  }
+
+  void _applyLatestSelectedCourseFromPrefs() {
+    final idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
+    Course? selected;
+    for (final c in allCourses) {
+      if (c.id == idCourse) {
+        selected = c;
+        break;
+      }
+    }
+
+    selected ??= allCourses.isEmpty
+        ? null
+        : (allCourses.toList()
+              ..sort((a, b) => (b.progress ?? 0).compareTo(a.progress ?? 0)))
+            .first;
+
+    setState(() {
+      lastestCourse = selected;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    getUserFromSharedPreference().then((_) {
-      getAllUser();
-    });
-    getEnrolledCourse();
+    unawaited(_bootstrap());
+  }
+
+  Future<void> _bootstrap() async {
+    pref = await SharedPreferences.getInstance();
+    final storedIdUser = pref.getInt('userId');
+
+    if (storedIdUser != null) {
+      final cachedCourses = _enrolledCache[storedIdUser];
+      final cachedUser = _userCache[storedIdUser];
+
+      if (cachedCourses != null || cachedUser != null) {
+        setState(() {
+          idUser = storedIdUser;
+          allCourses = cachedCourses != null ? List<Course>.from(cachedCourses) : allCourses;
+          user = cachedUser ?? user;
+          isLoading = false;
+        });
+
+        final idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
+        for (final c in allCourses) {
+          if (c.id == idCourse) {
+            lastestCourse = c;
+            break;
+          }
+        }
+      }
+    }
+
+    await getUserFromSharedPreference();
+    unawaited(getEnrolledCourse());
+    unawaited(getAllUser());
   }
 
   Future<void> getEnrolledCourse() async{
+    if (_isFetchingEnrolled) {
+      return;
+    }
+
+    _isFetchingEnrolled = true;
     pref = await SharedPreferences.getInstance();
     int? id = pref.getInt('userId');
     if(id != null) {
       try {
-        final result = await CourseService.getEnrolledCourse(id).timeout(Duration(seconds: 10));
-        final fetchedUser = await UserService.getUserById(id).timeout(Duration(seconds: 10));
+        final result = await CourseService.getEnrolledCourse(
+          id,
+          onRevalidated: (freshData) {
+            if (!mounted) return;
+            setState(() {
+              allCourses = freshData;
+              isLoading = false;
+            });
+            _enrolledCache[id] = List<Course>.from(freshData);
+            _applyLatestSelectedCourseFromPrefs();
+          },
+        ).timeout(Duration(seconds: 10));
+        if (!mounted) return;
         setState(() {
           allCourses = result;
-          user = fetchedUser;
           isLoading = false;
         });
-        final idCourse = pref.getInt('lastestSelectedCourse') ?? 0;
-        for (var c in allCourses) {
-          if(c.id == idCourse){
-            setState(() {
-              lastestCourse = c;
-            });
-            break;
-          }
-        }
+        _enrolledCache[id] = List<Course>.from(result);
+        _applyLatestSelectedCourseFromPrefs();
       } on TimeoutException catch (_) {
+        if (!mounted) return;
         setState(() {
           isLoading = false;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -75,6 +223,7 @@ class _HomeState extends State<Homescreen> {
           );
         });
       } catch (e) {
+        if (!mounted) return;
         setState(() {
           isLoading = false;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -82,24 +231,49 @@ class _HomeState extends State<Homescreen> {
           );
         });
         print('Error getEnrolledCourse: $e');
+      } finally {
+        _isFetchingEnrolled = false;
       }
+    } else {
+      _isFetchingEnrolled = false;
     }
   }
 
-  List<Student> sortUserbyPoint(List<Student> list) {
-    list.sort((a, b) => b.points!.compareTo(a.points!));
-    return list;
+  List<Student> sortUserByElo(List<Student> list) {
+    final sorted = List<Student>.from(list);
+    sorted.sort((a, b) => (b.elo ?? 0).compareTo(a.elo ?? 0));
+    return sorted;
   }
 
   List<Student> studentRole(List<Student> list) {
     return list.where((user) => user.role == 'STUDENT').toList();
   }
 
-  void getAllUser() async {
+  Future<void> getAllUser() async {
     try {
-      final result = await UserService.getAllUser().timeout(Duration(seconds: 10));
+      // Use getAllUser() to get the full list for accurate ranking (e.g. / 59 instead of / 50)
+      final result = await UserService.getAllUser(
+        onRevalidated: (freshData) {
+          if (!mounted) return;
+          final filtered = sortUserByElo(studentRole(freshData));
+          setState(() {
+            list = filtered;
+          });
+          // Recalculate rank after revalidation
+          for (int i = 0; i < list.length; i++) {
+            if (list[i].id == idUser) {
+              setState(() {
+                rank = i + 1;
+              });
+              break;
+            }
+          }
+        },
+      ).timeout(Duration(seconds: 10));
+
+      final filtered = sortUserByElo(studentRole(result));
       setState(() {
-        list = sortUserbyPoint(studentRole(result));
+        list = filtered;
       });
 
       if (idUser == 0) return;
@@ -133,11 +307,13 @@ class _HomeState extends State<Homescreen> {
     final storedIdUser = prefs.getInt('userId');
     if (storedIdUser != null) {
       final fetchedUser = await UserService.getUserById(storedIdUser);
+      if (!mounted) return;
       setState(() {
         idUser = storedIdUser;
         name = prefs.getString('name') ?? '';
         user = fetchedUser;
       });
+      _userCache[storedIdUser] = fetchedUser;
       getUserBadges(storedIdUser);
     } else {
       logout();
@@ -145,22 +321,33 @@ class _HomeState extends State<Homescreen> {
   }
 
   Future<void> getUserBadges(int userId) async {
-    final result = await BadgeService.getUserBadgeListByUserId(userId);
+    final result = await BadgeService.getUserBadgeListByUserId(
+      userId,
+      onRevalidated: (freshBadges) {
+        if (!mounted) return;
+        setState(() {
+          userBadges = freshBadges;
+        });
+      },
+    );
+    if (!mounted) return;
     setState(() {
       userBadges = result;
     });
   }
 
-  void logout() {
+  void logout() async {
     pref.remove('userId');
     pref.remove('name');
     pref.remove('role');
     pref.remove('token');
+    pref.remove('sessionId');
 
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => LoginScreen()
+        builder: (context) => LoginScreen(),
       ),
     );
   }
@@ -263,7 +450,7 @@ class _HomeState extends State<Homescreen> {
                               child: Text('Log Out', style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: AppColors.primaryColor)),
                             )
                           ],
-                        )
+                        ),
                       ],
                     ),
                   ),
@@ -287,6 +474,7 @@ class _HomeState extends State<Homescreen> {
                           children: [
                             SizedBox(height: 30,),
                             _buildProfile(),
+                            // _buildChatShortcut(),
                             _buildStats(),
                             _buildMyProgress(),
                             _buildMore(),
@@ -353,12 +541,21 @@ class _HomeState extends State<Homescreen> {
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'DIN_Next_Rounded',
                           ),
                         ),
-                        subtitle: Text(
-                          list[index].studentId!,
-                          style: TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              list[index].studentId ?? '',
+                              style: TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
+                            ),
+                            Text(
+                              list[index].eloTitle ?? 'Beginner',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54, fontFamily: 'DIN_Next_Rounded'),
+                            ),
+                          ],
                         ),
                         trailing: Text(
-                          '${list[index].points} Poin',
+                          '${list[index].elo ?? 0} ELO',
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
                         ),
                       ),
@@ -500,55 +697,161 @@ class _HomeState extends State<Homescreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start, // Align text to the left
-            children: [
-              Text(
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                      color: AppColors.primaryColor,
-                      fontFamily: 'DIN_Next_Rounded'
-                  )),
-              Text(
+                    color: AppColors.primaryColor,
+                    fontFamily: 'DIN_Next_Rounded',
+                  ),
+                ),
+                Text(
                   name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineLarge!.copyWith(
-                      color: AppColors.primaryColor,
-                      // fontSize: 28,
+                    color: AppColors.primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'DIN_Next_Rounded',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    user?.eloTitle ?? 'Beginner',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'DIN_Next_Rounded',
+                      color: Colors.black87,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'DIN_Next_Rounded'
-                  )),
-            ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          GestureDetector(
-            onTap: () => widget.updateIndex(4),
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.blue, // Background color
+          const SizedBox(width: 12),
+          Row(
+            children: [
+              IconButton(
+                key: _tutorialButtonKey,
+                tooltip: 'Ulangi tutorial',
+                onPressed: _showReplayTutorialPopup,
+                icon: const Icon(
+                  Icons.tips_and_updates_outlined,
+                  color: AppColors.primaryColor,
+                ),
               ),
-              child: ClipOval(
-                child: user?.image != null && user?.image != ""
-                    ? Image.network(
-                  user!.image!,
+              IconButton(
+                tooltip: 'Informasi',
+                onPressed: _showInfoPopup,
+                icon: const Icon(
+                  Icons.info_outline,
+                  color: AppColors.primaryColor,
+                ),
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => widget.updateIndex(4),
+                child: Container(
                   width: 50,
                   height: 50,
-                  fit: BoxFit.cover, // Ensures the image fills the container
-                )
-                    : Center(
-                  child: Icon(
-                    Icons.person,
-                    size: 30,
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blue, // Background color
+                  ),
+                  child: ClipOval(
+                    child: user?.image != null && user?.image != ""
+                        ? Image.network(
+                      user!.image!,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover, // Ensures the image fills the container
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.person,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                    )
+                        : Center(
+                      child: Icon(
+                        Icons.person,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           )
         ],
+      ),
+    );
+  }
+
+  Widget _buildChatShortcut() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ChatbotScreen(startFresh: true)),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 6,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.chat_bubble_outline, size: 28, color: Colors.white),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Levely Chat',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: 'DIN_Next_Rounded',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ngobrol dengan Levely untuk bantu jawab pertanyaanmu.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white70,
+                      fontFamily: 'DIN_Next_Rounded',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.white),
+          ],
+        ),
       ),
     );
   }
@@ -580,16 +883,22 @@ class _HomeState extends State<Homescreen> {
                 children: [
                   Row(
                     mainAxisAlignment:
-                    MainAxisAlignment.start,
+                    MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildInfoColumn(
-                          LineAwesomeIcons.medal_solid, 'Lencana', '${userBadges?.length ?? 0}', AppColors.accentColor),
-                      SizedBox(width: 24),
-                      _buildInfoColumn(
-                          LineAwesomeIcons.user_check_solid, 'Course', '${allCourses.isNotEmpty ? allCourses.length : 0}', AppColors.accentColor),
-                      SizedBox(width: 24),
-                      _buildInfoColumn(
-                          LineAwesomeIcons.trophy_solid, 'Peringkat', '$rank / ${list.length}', AppColors.accentColor),
+                      Expanded(
+                        child: _buildInfoColumn(
+                            LineAwesomeIcons.medal_solid, 'Lencana', '${userBadges?.length ?? 0}', AppColors.accentColor),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildInfoColumn(
+                            LineAwesomeIcons.user_check_solid, 'Course', '${allCourses.isNotEmpty ? allCourses.length : 0}', AppColors.accentColor),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildInfoColumn(
+                            LineAwesomeIcons.trophy_solid, 'Peringkat', '$rank / ${list.length}', AppColors.accentColor),
+                      ),
                     ],
                   ),
                   SizedBox(height: 24),
@@ -659,30 +968,36 @@ class _HomeState extends State<Homescreen> {
           size: 24,  // Ukuran icon
         ),
         SizedBox(width: 4),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label, // Teks yang ingin ditampilkan
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium!
-                  .copyWith(
-                // fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontFamily:
-                'DIN_Next_Rounded', // Ganti dengan font yang diinginkan
-              ),
-            ),
-            Text(value,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label, // Teks yang ingin ditampilkan
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context)
                     .textTheme
-                    .titleMedium!
+                    .labelMedium!
                     .copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontFamily: 'DIN_Next_Rounded'))
-          ],
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily:
+                  'DIN_Next_Rounded', // Ganti dengan font yang diinginkan
+                ),
+              ),
+              Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium!
+                      .copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: 'DIN_Next_Rounded'))
+            ],
+          ),
         )// Jarak antara icon dan text
       ],
     );
@@ -747,7 +1062,7 @@ class _HomeState extends State<Homescreen> {
       ) {
     return GestureDetector(
       onTap: () async {
-        await pref.setInt('lastestSelectedCourse', course.id);
+        unawaited(pref.setInt('lastestSelectedCourse', course.id));
         widget.updateIndex(2);
       },
       child: Container(
@@ -771,7 +1086,16 @@ class _HomeState extends State<Homescreen> {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: course.image != "" ? Image.network(course.image): Image.asset('lib/assets/pictures/imk-picture.jpg', fit: BoxFit.cover),
+                child: course.image != ""
+                    ? Image.network(
+                        course.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Image.asset(
+                          'lib/assets/pictures/imk-picture.jpg',
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Image.asset('lib/assets/pictures/imk-picture.jpg', fit: BoxFit.cover),
               ),
             ),
             Positioned(

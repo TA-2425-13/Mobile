@@ -170,7 +170,11 @@ class _UpdateProfileState extends State<UpdateProfile> {
                               ? Image.memory(photo!.bytes!, fit: BoxFit.cover)
                               : Image.file(File(photo!.path!), fit: BoxFit.cover))
                               : (user?.image != null && user!.image!.isNotEmpty
-                              ? Image.network(user!.image!, fit: BoxFit.cover)
+                              ? Image.network(
+                                  user!.image!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Icon(Icons.person, size: 100, color: Colors.grey),
+                                )
                               : Icon(Icons.person, size: 100, color: Colors.grey)),
                         ),
                       ),
@@ -359,7 +363,13 @@ class _UpdateProfileState extends State<UpdateProfile> {
                           ),
                           ElevatedButton(
                             onPressed: () async{
-                              await prefs.clear();
+                              await prefs.remove('userId');
+                              await prefs.remove('name');
+                              await prefs.remove('role');
+                              await prefs.remove('token');
+                              await prefs.remove('lastestSelectedCourse');
+                              await prefs.remove('latestSelectedCourse');
+                              await prefs.remove('getCourseDetail');
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(

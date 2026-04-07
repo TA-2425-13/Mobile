@@ -19,20 +19,33 @@ class _FriendsScreen extends State<FriendsScreen> {
 
   List<Student> user = [];
 
-  List<Student> sortUserbyPoint(List<Student> list) {
-    list.sort((a, b) => b.points!.compareTo(a.points!));
-    return list;
-  }
-
-  List<Student> studentRole(List<Student> list) {
-    return list.where((user) => user.role == 'STUDENT').toList();
+  List<Student> sortUserByElo(List<Student> list) {
+    final sorted = List<Student>.from(list);
+    sorted.sort((a, b) => (b.elo ?? 0).compareTo(a.elo ?? 0));
+    return sorted;
   }
 
   void getAllUser() async {
-    final result = await UserService.getAllUser();
-    setState(() {
-      user = sortUserbyPoint(studentRole(result));
-    });
+    try {
+      // Gunakan endpoint /user/leaderboard — sudah di-sort Elo desc & filter STUDENT di server
+      final result = await UserService.getLeaderboard(
+        onRevalidated: (freshData) {
+          if (!mounted) return;
+          setState(() {
+            user = freshData;
+          });
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        user = result;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        user = [];
+      });
+    }
   }
 
   @override
@@ -129,31 +142,31 @@ class _FriendsScreen extends State<FriendsScreen> {
   }
 
   Widget _listFriends() {
-    user = sortUserbyPoint(user);
+    final sortedUsers = sortUserByElo(user);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: ListView.builder(
-        itemCount: user.length,
+        itemCount: sortedUsers.length,
         itemBuilder: (context, count) {
-          return _listFriendsItem(user[count], count,  count == 0 ? 0 : count == user.length - 1 ? 2 : 1);
+          return _listFriendsItem(sortedUsers[count], count,  count == 0 ? 0 : count == sortedUsers.length - 1 ? 2 : 1);
         },
       ),
     );
   }
 
   Widget _listFriendsForLandscape() {
-    user = sortUserbyPoint(user);
+    final sortedUsers = sortUserByElo(user);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: ListView.builder(
         shrinkWrap: true, // This makes ListView take only the space it needs
         physics: NeverScrollableScrollPhysics(), // This disables ListView's own scrolling
-        itemCount: user.length,
+        itemCount: sortedUsers.length,
         itemBuilder: (context, count) {
           return _listFriendsItem(
-              user[count],
+              sortedUsers[count],
               count,
-              count == 0 ? 0 : count == user.length - 1 ? 2 : 1
+              count == 0 ? 0 : count == sortedUsers.length - 1 ? 2 : 1
           );
         },
       ),
@@ -199,12 +212,21 @@ class _FriendsScreen extends State<FriendsScreen> {
               user.name,
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
             ),
-            subtitle: Text(
-              user.studentId!,
-              style: TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.studentId ?? '',
+                  style: TextStyle(fontSize: 12, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
+                ),
+                Text(
+                  user.eloTitle ?? 'Beginner',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54, fontFamily: 'DIN_Next_Rounded'),
+                ),
+              ],
             ),
             trailing: Text(
-              '${user.points} Poin',
+              '${user.elo ?? 0} ELO',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'DIN_Next_Rounded'),
             ),
           ),
@@ -219,142 +241,97 @@ class _FriendsScreen extends State<FriendsScreen> {
       height: 300,
       width: double.infinity,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              list.isNotEmpty && list.length >= 2 && list[1].image != "" && list[1].image != null ?
-              CircleAvatar(
-                  radius: 30,
-                  backgroundImage: NetworkImage(list[1].image!)) :
-              CircleAvatar(
-                  radius: 30,
-                  child: Icon(Icons.person, size: 20,)),
-              Text(list.isNotEmpty && list.length >= 2? list[1].name : '', style: TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DIN_Next_Rounded'),),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                    padding: EdgeInsets.all(10),
-                  child: Text('${list.isNotEmpty && list.length >= 2 ? list[1].points : 0} pts', style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),),
-                ),
-              ),
-              SizedBox(
-                height: 10,
-                width: 10,
-              ),
-              Container(
-                width: 75,
-                height: 120,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('lib/assets/leaderboards/banner-silver.png'),
-                    fit: BoxFit.fitWidth,
-                  ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(0),
-                    bottomLeft: Radius.circular(0),
-                    bottomRight: Radius.circular(0),
-                  ),
-                ),
-                // child: Center(child: Text('#2', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontSize: 24, fontWeight: FontWeight.w900)),),
-              )
-            ],
+          Expanded(
+            child: _buildPodiumItem(
+              student: list.length >= 2 ? list[1] : null,
+              bannerAsset: 'lib/assets/leaderboards/banner-silver.png',
+              podiumHeight: 120,
+            ),
           ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              list.isNotEmpty && list[0].image != "" && list[0].image != null ?
-              CircleAvatar(
-                  radius: 30,
-                  backgroundImage: NetworkImage(list[0].image!)) :
-              CircleAvatar(
-                  radius: 30,
-                  child: Icon(Icons.person, size: 20,)),
-              Text(list.isNotEmpty ? list[0].name : '', style: TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DIN_Next_Rounded'),),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('${list.isNotEmpty? list[0].points : 0} pts', style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),),
-                ),
-              ),
-              SizedBox(
-                height: 10,
-                width: 10,
-              ),
-              Container(
-                width: 75,
-                height: 150,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('lib/assets/leaderboards/banner-gold.png'),
-                    fit: BoxFit.fitWidth,
-                  ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                    bottomLeft: Radius.circular(0),
-                    bottomRight: Radius.circular(0),
-                  ),
-                ),
-                // child: Center(child: Text('#1', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontSize: 24, fontWeight: FontWeight.w900)),),
-              )
-            ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: _buildPodiumItem(
+              student: list.isNotEmpty ? list[0] : null,
+              bannerAsset: 'lib/assets/leaderboards/banner-gold.png',
+              podiumHeight: 150,
+            ),
           ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              list.isNotEmpty && list.length >= 3 && list[2].image != "" && list[2].image != null ?
-              CircleAvatar(
-                  radius: 30,
-                  backgroundImage: NetworkImage(list[2].image!)) :
-              CircleAvatar(
-                  radius: 30,
-                  child: Icon(Icons.person, size: 20,)),
-              Text(list.isNotEmpty && list.length >= 3 ? list[2].name : '', style: TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'DIN_Next_Rounded'),),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('${list.isNotEmpty && list.length >= 3 ? list[2].points : 0} pts', style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),),
-                ),
-              ),
-              SizedBox(
-                height: 10,
-                width: 10,
-              ),
-              Container(
-                width: 75,
-                height: 90,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('lib/assets/leaderboards/banner-bronze.png'),
-                    fit: BoxFit.fitWidth,
-                  ),
-                  borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(0),
-                      topRight: Radius.circular(16),
-                      bottomLeft: Radius.circular(0),
-                      bottomRight: Radius.circular(0),
-                  ),
-                ),
-                // child: Center(child: Text('#3', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontSize: 24, fontWeight: FontWeight.w900)),),
-              )
-            ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: _buildPodiumItem(
+              student: list.length >= 3 ? list[2] : null,
+              bannerAsset: 'lib/assets/leaderboards/banner-bronze.png',
+              podiumHeight: 90,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPodiumItem({
+    required Student? student,
+    required String bannerAsset,
+    required double podiumHeight,
+  }) {
+    final image = student?.image;
+    final hasImage = image != null && image.isNotEmpty;
+    final displayName = student?.name ?? '';
+    final elo = student?.elo ?? 0;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        hasImage
+            ? CircleAvatar(
+                radius: 30,
+                backgroundImage: NetworkImage(image),
+                onBackgroundImageError: (_, __) {},
+                child: const Icon(Icons.person, size: 20),
+              )
+            : const CircleAvatar(radius: 30, child: Icon(Icons.person, size: 20)),
+        const SizedBox(height: 8),
+        Text(
+          displayName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontFamily: 'DIN_Next_Rounded',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$elo ELO',
+            style: TextStyle(fontSize: 12, fontFamily: 'DIN_Next_Rounded'),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: 75,
+          height: podiumHeight,
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage(bannerAsset),
+              fit: BoxFit.fitWidth,
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -5,7 +5,7 @@ class CustomTabIndicator extends Decoration {
   final double widthFraction;
   final double height;
 
-  CustomTabIndicator({
+  const CustomTabIndicator({
     required this.color,
     this.widthFraction = 1 / 3,
     this.height = 4.0,

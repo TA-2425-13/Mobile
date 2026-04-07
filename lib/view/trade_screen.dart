@@ -113,7 +113,15 @@ class _TradeScreenState extends State<TradeScreen> {
               itemBuilder: (context, index) {
                 final trade = trades[index];
                 return ListTile(
-                  leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(trade.image)),
+                  leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: trade.image.toLowerCase().startsWith('http')
+                        ? Image.network(
+                          trade.image,
+                          errorBuilder: (context, error, stackTrace) => Image.asset('lib/assets/pictures/icon.png'),
+                        )
+                          : Image.asset(trade.image)
+                  ),
                   title: Text(
                       trade.title,
                       style: TextStyle(

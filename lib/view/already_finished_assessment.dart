@@ -1,21 +1,24 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../model/assessment.dart';
-import '../model/chapter_status.dart';
-import '../model/user.dart';
-import '../service/chapter_service.dart';
-import '../service/user_chapter_service.dart';
-import '../service/user_service.dart';
-import '../utils/colors.dart';
+import 'package:app/model/assessment.dart';
+import 'package:app/model/chapter_status.dart';
+import 'package:app/model/user.dart';
+import 'package:app/service/chapter_service.dart';
+import 'package:app/utils/colors.dart';
+import 'package:app/view/questionnaire_screen.dart';
 
 class AlreadyFinishedAssessmentAssessmentScreen extends StatefulWidget {
   final ChapterStatus status;
   final Student user;
+  final Function(ChapterStatus)? updateStatus;
+  final int? level;
   const AlreadyFinishedAssessmentAssessmentScreen({
     super.key,
     required this.status,
     required this.user,
+    this.updateStatus,
+    this.level,
   });
 
   @override
@@ -31,6 +34,7 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
   Student? user;
   late ChapterStatus status;
   Assessment? question;
+  Future<bool>? _resultFuture;
 
   @override
   void initState() {
@@ -43,9 +47,23 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
   }
 
   void getAssessment(int id) async {
+    try {
+      final latestAttempt = await ChapterService.getLatestAssessmentAttempt(id, widget.user.id);
+      if (latestAttempt != null) {
+        setState(() {
+          question = latestAttempt.toAssessment();
+          _resultFuture = _calculateResults();
+        });
+        return;
+      }
+    } catch (_error) {
+      // fallback to legacy endpoint below
+    }
+
     final resultAssessment = await ChapterService.getAssessmentByChapterId(id);
     setState(() {
       question = resultAssessment;
+      _resultFuture = _calculateResults();
     });
   }
 
@@ -97,34 +115,44 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
 
   @override
   Widget build(BuildContext context) {
+    Widget child;
     if (question != null) {
-      return _buildQuizResultFuture();
+      child = _buildQuizResultFuture();
     } else {
-      return _emptyState();
+      child = _emptyState();
     }
+    
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: child,
+      floatingActionButton: widget.level == 8
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const QuestionnaireScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.assignment, color: Colors.white),
+              label: const Text('Isi Kuesioner', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)),
+              backgroundColor: AppColors.primaryColor,
+            )
+          : null,
+    );
   }
 
   Widget _buildQuizResultFuture() {
+    final resultFuture = _resultFuture;
+    if (resultFuture == null) {
+      return _loadingState();
+    }
     return FutureBuilder<bool>(
-      future: _calculateResults(), // Move result calculation to async function
+      future: resultFuture, // Move result calculation to async function
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox(
-              width: double.infinity,
-              height: double.infinity,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 10),
-                    Text("Mohon Tunggu", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded'),
-                    ),
-                  ],
-                ),
-              )
-          ); // Show loading indicator while waiting
+          return _loadingState(); // Show loading indicator while waiting
         } else if (snapshot.hasError) {
           return Text('Error: ${snapshot.error}');
         } else {
@@ -137,34 +165,79 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
   Future<bool> _calculateResults() async {
     tapped = true;
     correctAnswer = 0; // Reset the counter before starting the calculation
-    double rangeScore = 100 / question!.questions.length;
+    final questions = question?.questions ?? [];
+    if (questions.isEmpty) {
+      point = status.assessmentGrade;
+      return true;
+    }
+    
+    final nonEssayQuestions = questions.where((q) => q.type != 'EY').toList();
+    final totalAssessable = nonEssayQuestions.isEmpty ? 1 : nonEssayQuestions.length;
+    final rangeScore = (100 / totalAssessable).ceil();
 
-    for (int i = 0; i < status.assessmentAnswer.length; i++) {
-      question?.questions[i].selectedAnswer = status.assessmentAnswer[i];
-
-      if (question?.questions[i].type != 'EY') {
-        question?.questions[i].isCorrect =
-            question?.questions[i].selectedAnswer == question?.questions[i].correctedAnswer;
-        if (question?.questions[i].isCorrect == true) {
-          question?.questions[i].score = rangeScore.ceil();
-          correctAnswer++;
-          print(correctAnswer);
-        }
-      } else {
-        double result = await checkEssay(question!.questions[i].selectedAnswer, question!.questions[i].correctedAnswer);
-        double similarity = double.parse(result.toStringAsFixed(1));
-        print(similarity);
-        question?.questions[i].isCorrect = similarity > 0;
-        if (question?.questions[i].isCorrect == true) {
-          question?.questions[i].score = (rangeScore * similarity).ceil();
-          correctAnswer++;
-          print(correctAnswer);
-        }
+    final hasPreloadedAnswers = questions.any((q) => q.selectedAnswer.trim().isNotEmpty);
+    if (!hasPreloadedAnswers && status.assessmentAnswer.isNotEmpty) {
+      final total = status.assessmentAnswer.length < questions.length
+          ? status.assessmentAnswer.length
+          : questions.length;
+      for (int i = 0; i < total; i++) {
+        questions[i].selectedAnswer = status.assessmentAnswer[i];
       }
     }
 
-    point = status.assessmentGrade;
+    for (int i = 0; i < questions.length; i++) {
+      final current = questions[i];
+      if (current.type == 'EY') {
+        current.isCorrect = false;
+        current.score = 0;
+        continue;
+      }
+
+      final normalizedSelected = current.selectedAnswer.trim().toLowerCase();
+      final normalizedCorrect = current.correctedAnswer.trim().toLowerCase();
+      final isCorrect = current.isCorrect ||
+          (normalizedSelected.isNotEmpty && normalizedSelected == normalizedCorrect);
+
+      current.isCorrect = isCorrect;
+      if (isCorrect) {
+        if (current.score <= 0) {
+          current.score = rangeScore;
+        }
+        correctAnswer++;
+      } else {
+        current.score = 0;
+      }
+    }
+
+    // Score must reflect objective questions only and ignore essay.
+    point = nonEssayQuestions.fold<int>(0, (sum, q) => sum + q.score);
+
+    // Fallback to stored grade only when there is no objective question in payload.
+    if (nonEssayQuestions.isEmpty) {
+      point = status.assessmentGrade;
+    }
     return true; // Ensure the future completes successfully
+  }
+
+  Widget _loadingState() {
+    return SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 10),
+              Text(
+                "Mohon Tunggu",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded'),
+              ),
+            ],
+          ),
+        )
+    );
   }
 
   Widget _buildQuizResult() {
@@ -209,7 +282,7 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.all(0),
-                                    child: Text(': $correctAnswer / ${question!.questions.length}', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white),),
+                                    child: Text(': $correctAnswer / ${question!.questions.where((q) => q.type != 'EY').length}', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white),),
                                   ),
                                 ],
                               ),
@@ -229,11 +302,11 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
                                 children: [
                                   Padding(
                                     padding: const EdgeInsets.all(0),
-                                    child: Text('Poin', style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
+                                    child: Text('Info Poin', style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.all(0),
-                                    child: Text(': +$point', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
+                                    child: Text(': ${status.assessmentEloDelta > 0 ? "+" : ""}${status.assessmentEloDelta}', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', color: Colors.white)),
                                   ),
                                 ],
                               ),
@@ -273,10 +346,32 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
             child: ListTile(
               leading: Text('${number + 1}', style: TextStyle(fontSize: 20, fontFamily: 'DIN_Next_Rounded', color: AppColors.primaryColor)),
               isThreeLine: true,
-              title: Column(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  allQuestionsAnswered && tapped ? Text("Skor : ${question?.questions[number].score} / ${(100 / (question!.questions.length)).ceil()}", style: TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)) : SizedBox(),
-                  Text(question?.questions[number].question ?? 'No question available', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        allQuestionsAnswered && tapped ? Text("Skor : ${question?.questions[number].score} / ${(100 / (question!.questions.where((q) => q.type != 'EY').isNotEmpty ? question!.questions.where((q) => q.type != 'EY').length : 1)).ceil()}", style: TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)) : SizedBox(),
+                        Text(question?.questions[number].question ?? 'No question available', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.amber.shade400)
+                    ),
+                    child: Text(
+                      '${question?.questions[number].elo} ELO', 
+                      style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', fontSize: 12)
+                    ),
+                  ),
                 ],
               ),
               subtitle: question?.questions[number].option.isNotEmpty ?? false
@@ -293,10 +388,32 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
             child: ListTile(
               leading: Text('${number + 1}', style: TextStyle(fontSize: 20, fontFamily: 'DIN_Next_Rounded', color: AppColors.primaryColor)),
               isThreeLine: true,
-              title: Column(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  allQuestionsAnswered && tapped ? Text("Skor : ${question?.questions[number].score} / ${(100 / (question!.questions.length)).ceil()}", style: TextStyle(fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)) : SizedBox(),
-                  Text(question?.questions[number].question ?? 'No question available', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        allQuestionsAnswered && tapped ? Text("Skor : Menunggu Review", style: TextStyle(color: Colors.orange, fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)) : SizedBox(),
+                        Text(question?.questions[number].question ?? 'No question available', style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.amber.shade400)
+                    ),
+                    child: Text(
+                      '${question?.questions[number].elo} ELO', 
+                      style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded', fontSize: 12)
+                    ),
+                  ),
                 ],
               ),
               subtitle: _buildTextAnswer(question!.questions[number]),
@@ -394,7 +511,7 @@ class _AlreadyFinishedAssessmentAssessmentScreenState extends State<AlreadyFinis
   }
 
   Widget _buildTextAnswer(Question question) {
-    TextEditingController controller = TextEditingController(text: question.selectedAnswer ?? '');
+    TextEditingController controller = TextEditingController(text: question.selectedAnswer);
     controller.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
 
     return Card(

@@ -1,10 +1,8 @@
 import 'package:app/model/user_badge.dart';
 import 'dart:convert';
-import 'package:app/model/login.dart';
 import 'package:http/http.dart' as http;
 
 import '../global_var.dart';
-import '../model/user.dart';
 
 class UserBadgeService {
   static Future<UserBadge> updateUserBadgeStatus(int userBadgeId, bool status) async {

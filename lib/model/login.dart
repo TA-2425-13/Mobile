@@ -3,12 +3,14 @@ class Login{
   String name;
   String role;
   String token;
+  int? sessionId;
 
   Login({
     required this.id,
     required this.name,
     required this.role,
-    required this.token
+    required this.token,
+    this.sessionId,
   });
 
   factory Login.fromJson(Map<String, dynamic> json) {
@@ -17,6 +19,7 @@ class Login{
       name: json['name'],
       role: json['role'],
       token: json['token'],
+      sessionId: json['sessionId'],
     );
   }
 }

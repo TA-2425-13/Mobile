@@ -4,8 +4,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:app/model/assignment.dart';
 import 'package:app/model/chapter_status.dart';
-import 'package:app/model/learning_material.dart';
-import 'package:app/model/user_course.dart';
 import 'package:app/service/badge_service.dart';
 import 'package:app/service/chapter_service.dart';
 import 'package:app/service/user_chapter_service.dart';
@@ -17,27 +15,21 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_file_downloader/flutter_file_downloader.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../model/assignment.dart';
-import '../model/chapter_status.dart';
-import '../model/learning_material.dart';
-import '../service/badge_service.dart';
-import '../service/chapter_service.dart';
-import '../service/user_chapter_service.dart';
 import '../service/user_course_service.dart';
-import '../service/user_service.dart';
-import '../utils/colors.dart';
 import 'congratulation_screen.dart';
+import 'questionnaire_screen.dart';
 
 class AssignmentScreen extends StatefulWidget {
   final ChapterStatus status;
   final Student user;
   final UserCourse uc;
   final int level;
+  final String? chapterName;
   final int idBadge;
   final int chLength;
   final Function(bool) updateProgress;
@@ -48,6 +40,7 @@ class AssignmentScreen extends StatefulWidget {
     required this.user,
     required this.uc,
     required this.level,
+    this.chapterName,
     this.idBadge = 0,
     required this.chLength,
     required this.updateProgress,
@@ -186,8 +179,103 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
   void updateProgressAssignment() {
     if (status.assignmentDone && status.isCompleted && !showDialogAssignmentOnce) {
       showDialogAssignmentOnce = true;
-      showCompletionDialog(context, "Yeay kamu berhasil menyelesaikan Chapter ini, Ayo lanjutkan pelajari chapter yang lain");
+      if (widget.level == 8) {
+        showQuestionnairePopUp(context);
+      } else {
+        showCompletionDialog(context, "Yeay kamu berhasil menyelesaikan Chapter ini, Ayo lanjutkan pelajari chapter yang lain");
+      }
     }
+  }
+
+  void showQuestionnairePopUp(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          title: Text(
+            "Progress Completed!",
+            style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: AppColors.primaryColor),
+            textAlign: TextAlign.center,
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                Image.asset('lib/assets/pixels/check.png', height: 72),
+                SizedBox(height: 16,),
+                Text(
+                  "Yeay kamu berhasil menyelesaikan Chapter 8! Mohon luangkan waktu sebentar untuk mengisi kuesioner.",
+                  style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryColor
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const QuestionnaireScreen(),
+                    ),
+                  ).then((_) {
+                    _navigateToCongratulations();
+                  });
+                },
+                child: Text(
+                  "Isi Kuesioner",
+                  style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: Colors.white),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _navigateToCongratulations();
+                },
+                child: Text(
+                  "Nanti Saja",
+                  style: TextStyle(fontFamily: 'DIN_Next_Rounded', color: Colors.grey),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _navigateToCongratulations() {
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CongratulationsScreen(
+          message: "You have successfully completed Chapter 8!",
+          onContinue: () async {
+            if (!context.mounted) return;
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Mainscreen(navIndex: 2),
+              ),
+              (route) => false,
+            );
+          },
+          idBadge: idBadge,
+        ),
+      ),
+    );
   }
 
   void showCompletionDialog(BuildContext context, String message) {
@@ -230,13 +318,15 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                         MaterialPageRoute(
                           builder: (context) => CongratulationsScreen(
                             message: "You have successfully completed this assignment!",
-                            onContinue: () {
+                            onContinue: () async {
+                              if (!context.mounted) return;
+
                               Navigator.pushAndRemoveUntil(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => Mainscreen(navIndex: 2),
                                 ),
-                                    (route) => false, // Remove all previous routes
+                                (route) => false,
                               );
                             },
                             idBadge: idBadge,
@@ -388,14 +478,6 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                           if(!status.assignmentDone && !complete){
                             user?.points = user!.points! + calculatePoint(difference.inMinutes);
                           }
-                          print(user?.points);
-                          print("awoo");
-
-                          if (widget.level == uc.currentChapter) {
-                            uc.currentChapter++;
-                            uc.progress = (((uc.currentChapter - 1) / chLength) * 100).toInt();
-                          }
-
                           if (idBadge != 0) {
                             createUserBadge(user!.id, idBadge);
                             user?.badges = user!.badges! + 1;
@@ -455,7 +537,7 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                         Text("Feedback", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'DIN_Next_Rounded')),
                         Text("Score : ${status.assignmentScore}", style: TextStyle(fontFamily: 'DIN_Next_Rounded')),
                         Text(
-                          "${status.assignmentFeedback}",
+                          status.assignmentFeedback,
                           style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
                         ),
                       ],

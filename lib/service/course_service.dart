@@ -1,14 +1,30 @@
 import 'dart:convert';
 import 'package:app/model/chapter.dart';
-import 'package:http/http.dart' as http;
+import 'api_cache_service.dart';
 
 import '../global_var.dart';
 import '../model/course.dart';
 
 class CourseService {
-  static Future<List<Course>> getEnrolledCourse(int id) async {
+  static Future<List<Course>> getEnrolledCourse(
+    int id, {
+    void Function(List<Course> freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/user/$id/courses'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/user/$id/courses');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          final freshCourses = List<Course>.from(
+            freshResult.map((item) => Course.fromJson(item)),
+          );
+          onRevalidated(freshCourses);
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       List<Course> courses = List<Course>.from(
@@ -22,9 +38,33 @@ class CourseService {
     }
   }
 
-  static Future<Course> getCourse(int id) async {
+  static Future<Course> getCourse(
+    int id, {
+    void Function(Course freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/course/$id'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/course/$id');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          onRevalidated(
+            Course(
+              id: freshResult['id'],
+              courseName: freshResult['name'],
+              codeCourse: freshResult['code'],
+              description: freshResult['description'],
+              image: freshResult['image'],
+              createdAt: DateTime.parse(freshResult['createdAt']),
+              updatedAt: DateTime.parse(freshResult['updatedAt']),
+              progress: 0,
+            ),
+          );
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
       Course courses = Course(
@@ -43,28 +83,46 @@ class CourseService {
     }
   }
 
-  static Future<List<Chapter>> getChapterByCourse(int id) async {
+  static Future<List<Chapter>> getChapterByCourse(
+    int id, {
+    void Function(List<Chapter> freshData)? onRevalidated,
+  }) async {
     try {
-      final response = await http.get(Uri.parse('${GlobalVar.baseUrl}/course/$id/chapters'));
+      final uri = Uri.parse('${GlobalVar.baseUrl}/course/$id/chapters');
+      final response = await ApiCacheService.getSWR(
+        uri,
+        onRevalidated: (freshResponse) {
+          if (onRevalidated == null) {
+            return;
+          }
+          final freshResult = jsonDecode(freshResponse.body);
+          final freshChapters = List<Chapter>.from(
+            freshResult.map((item) => Chapter.fromJson(item)),
+          );
+          onRevalidated(freshChapters);
+        },
+      );
       final body = response.body;
       final result = jsonDecode(body);
-      print(result);
       List<Chapter> chapter = List.from(
-        result.map(
-            (result) => Chapter(
-                id: result['id'],
-                name: result['name'],
-                description: result['description'],
-                level: result['level'],
-                courseId: result['courseId'],
-                isCheckpoint: result['isCheckpoint'],
-                createdAt: DateTime.parse(result['createdAt']),
-                updatedAt: DateTime.parse(result['updatedAt']),
-            )
-        )
+        result.map((result) => Chapter.fromJson(result))
       );
       return chapter;
     } catch(e){
+      throw Exception(e.toString());
+    }
+  }
+
+  static Future<List<Chapter>> getChapterByCourseForUser(int courseId, int userId) async {
+    try {
+      final uri = Uri.parse('${GlobalVar.baseUrl}/course/$courseId/chapters/user/$userId');
+      final response = await ApiCacheService.get(uri);
+      final result = jsonDecode(response.body);
+
+      return List<Chapter>.from(
+        result.map((item) => Chapter.fromJson(item)),
+      );
+    } catch (e) {
       throw Exception(e.toString());
     }
   }

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 
-import '../model/chapter_status.dart';
-import '../model/learning_material.dart';
-import '../service/chapter_service.dart';
-import '../service/user_chapter_service.dart';
-import '../utils/colors.dart';
+import 'package:app/model/chapter_status.dart';
+import 'package:app/model/learning_material.dart';
+import 'package:app/service/chapter_service.dart';
+import 'package:app/service/user_chapter_service.dart';
+import 'package:app/utils/colors.dart';
+import 'package:app/view/chatbot_screen.dart';
 
 class MaterialScreen extends StatefulWidget {
   final ChapterStatus status;
@@ -130,8 +131,10 @@ class _MaterialScreenState extends State<MaterialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
         if (material != null)
           Container(
             decoration: BoxDecoration(
@@ -191,8 +194,30 @@ class _MaterialScreenState extends State<MaterialScreen> {
             ),
           ),
       ],
-    );
-  }
+    ),
+    floatingActionButton: material != null
+        ? FloatingActionButton.extended(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatbotScreen(
+                    // Reset visible chat while keeping chapter-specific
+                    // chatbot sessions isolated from other chapters.
+                    inheritSession: true,
+                    materialId: material!.id,
+                    chapterId: widget.status.chapterId,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+            label: const Text('Tanya Levely', style: TextStyle(color: Colors.white, fontFamily: 'DIN_Next_Rounded', fontWeight: FontWeight.bold)),
+            backgroundColor: AppColors.primaryColor,
+          )
+        : null,
+  );
+}
 
   Widget _buildHTMLContent(String material) {
     return Padding(

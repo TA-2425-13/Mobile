@@ -5,11 +5,10 @@ import 'package:app/service/user_service.dart';
 import 'package:app/utils/colors.dart';
 import 'package:app/view/main_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 
@@ -28,6 +27,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isLoading = false;
 
   void login() async {
+    if (isLoading) return;
+
     setState(() => isLoading = true);
 
     try {
@@ -44,6 +45,12 @@ class _LoginScreenState extends State<LoginScreen> {
           await prefs.setString('name', credential.name);
           await prefs.setString('role', credential.role);
           await prefs.setString('token', credential.token);
+          // Tandai sudah bukan first launch agar setelah update/reinstall
+          // user tidak dikirim ke onboarding lagi (cukup ke login).
+          await prefs.setBool('firstLaunch', false);
+          if (credential.sessionId != null) {
+            await prefs.setInt('sessionId', credential.sessionId!);
+          }
 
           Navigator.pushReplacement(
             context,
@@ -118,177 +125,223 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    double fontSize = width * 0.035;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            SizedBox(
-              height: 16,
-            ),
-            !isLandscape ? SizedBox(
-              height: 400,
-              child: Stack(
-                children: <Widget>[
-                  Positioned(
-                    top: -40,
-                    height: 400,
-                    width: width,
-                    child: FadeInUp(
-                        duration: Duration(seconds: 1),
-                        child: Container(
-                          decoration: BoxDecoration(
-                              image: DecorationImage(
-                                  image: AssetImage(
-                                      'lib/assets/images/background.png'),
-                                  fit: BoxFit.fill)),
-                        )),
-                  ),
-                  Positioned(
-                    height: 400,
-                    width: width + 20,
-                    child: FadeInUp(
-                        duration: Duration(milliseconds: 1000),
-                        child: Container(
-                          decoration: BoxDecoration(
-                              image: DecorationImage(
-                                  image: AssetImage(
-                                      'lib/assets/vectors/welcome_primary.png'))),
-                        )),
-                  )
-                ],
-              ),
-            ) : SizedBox(),
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  FadeInUp(
-                      duration: Duration(milliseconds: 1500),
-                      child: Text(
-                        "Login",
-                        style: TextStyle(
-                            color: GlobalVar.primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: fontSize * 1.5,
-                            fontFamily: 'DIN_Next_Rounded'),
-                      )),
-                  SizedBox(
-                    height: 30,
-                  ),
-                  FadeInUp(
-                      duration: Duration(milliseconds: 1700),
-                      child: Container(
-                        decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            color: Colors.white,
-                            border: Border.all(
-                                color: const Color.fromRGBO(68, 31, 127, .3)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color.fromRGBO(68, 31, 127, .3),
-                                blurRadius: 20,
-                                offset: Offset(0, 10),
-                              )
-                            ]),
-                        child: Column(
-                          children: <Widget>[
-                            Container(
-                              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                              decoration: BoxDecoration(
-                                  border: Border(
-                                      bottom: BorderSide(
-                                          color: Color.fromRGBO(
-                                              68, 31, 127, .3)))),
-                              child: TextField(
-                                style: TextStyle(
-                                    fontFamily: 'DIN_Next_Rounded'
-                                ),
-                                controller: emailController,
-                                decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                    hintText: "Username",
-                                    hintStyle:
-                                    TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontFamily: 'DIN_Next_Rounded',
-                                        fontSize: fontSize
-                                    )),
-                              ),
-                            ),
-                            Container(
-                              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                              child: TextField(
-                                style:
-                                TextStyle(fontFamily: 'DIN_Next_Rounded'),
-                                controller: passwordController,
-                                obscureText: true,
-                                decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                    hintText: "Password",
-                                    hintStyle:
-                                    TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontFamily: 'DIN_Next_Rounded',
-                                        fontSize: fontSize
-                                    )),
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final availableWidth = constraints.maxWidth;
+            final availableHeight = constraints.maxHeight;
+            final contentMaxWidth = availableWidth > 600 ? 520.0 : availableWidth;
+            final baseFontSize = (availableWidth * 0.04).clamp(14.0, 18.0).toDouble();
+            final titleFontSize = (baseFontSize * 1.5).clamp(20.0, 28.0).toDouble();
+            final headerHeight = isLandscape
+                ? 0.0
+                : (availableHeight * 0.34).clamp(180.0, 320.0).toDouble();
+            final sidePadding = availableWidth < 360 ? 12.0 : 16.0;
+            final topGap = isLandscape ? 8.0 : 16.0;
+            final sectionGap = isLandscape
+              ? (availableHeight * 0.02).clamp(12.0, 18.0).toDouble()
+              : (availableHeight * 0.04).clamp(16.0, 30.0).toDouble();
+            final innerVerticalPadding = isLandscape ? 10.0 : 16.0;
+            final helpToButtonGap = isLandscape ? 12.0 : 20.0;
+            final bottomSpacing =
+              keyboardInset > 0 ? keyboardInset + 16 : (isLandscape ? 8.0 : 16.0) + bottomInset;
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: bottomSpacing),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      SizedBox(height: topGap),
+                      !isLandscape
+                          ? SizedBox(
+                              height: headerHeight,
+                              child: Stack(
+                                children: <Widget>[
+                                  Positioned(
+                                    top: -headerHeight * 0.1,
+                                    height: headerHeight,
+                                    width: contentMaxWidth,
+                                    child: FadeInUp(
+                                      duration: Duration(seconds: 1),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          image: DecorationImage(
+                                            image: AssetImage('lib/assets/pictures/background-pattern.png'),
+                                            fit: BoxFit.fill,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    height: headerHeight,
+                                    width: contentMaxWidth + 20,
+                                    child: FadeInUp(
+                                      duration: Duration(milliseconds: 1000),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          image: DecorationImage(
+                                            image: AssetImage('lib/assets/vectors/welcome_primary.png'),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             )
+                          : SizedBox.shrink(),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: sidePadding, vertical: innerVerticalPadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            FadeInUp(
+                              duration: Duration(milliseconds: 1500),
+                              child: Text(
+                                "Login",
+                                style: TextStyle(
+                                  color: GlobalVar.primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: titleFontSize,
+                                  fontFamily: 'DIN_Next_Rounded',
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: sectionGap),
+                            FadeInUp(
+                              duration: Duration(milliseconds: 1700),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  color: Colors.white,
+                                  border: Border.all(
+                                    color: const Color.fromRGBO(68, 31, 127, .3),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Color.fromRGBO(68, 31, 127, .3),
+                                      blurRadius: 20,
+                                      offset: Offset(0, 10),
+                                    )
+                                  ],
+                                ),
+                                child: Column(
+                                  children: <Widget>[
+                                    Container(
+                                      padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Color.fromRGBO(68, 31, 127, .3),
+                                          ),
+                                        ),
+                                      ),
+                                      child: TextField(
+                                        style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                                        controller: emailController,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                                        ],
+                                        decoration: InputDecoration(
+                                          border: InputBorder.none,
+                                          hintText: "Username",
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey.shade700,
+                                            fontFamily: 'DIN_Next_Rounded',
+                                            fontSize: baseFontSize,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                      child: TextField(
+                                        style: TextStyle(fontFamily: 'DIN_Next_Rounded'),
+                                        controller: passwordController,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                                        ],
+                                        obscureText: true,
+                                        decoration: InputDecoration(
+                                          border: InputBorder.none,
+                                          hintText: "Password",
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey.shade700,
+                                            fontFamily: 'DIN_Next_Rounded',
+                                            fontSize: baseFontSize,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 20),
+                            FadeInUp(
+                              duration: Duration(milliseconds: 1700),
+                              child: Center(
+                                child: TextButton(
+                                  onPressed: _launchEmail,
+                                  child: Text(
+                                    "Butuh Bantuan?",
+                                    style: TextStyle(
+                                      color: AppColors.primaryColor,
+                                      fontFamily: 'DIN_Next_Rounded',
+                                      fontSize: baseFontSize,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: helpToButtonGap),
+                            FadeInUp(
+                              duration: Duration(milliseconds: 1900),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: MaterialButton(
+                                  onPressed: login,
+                                  color: GlobalVar.primaryColor,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(50),
+                                  ),
+                                  height: 50,
+                                  child: Center(
+                                    child: isLoading
+                                        ? CircularProgressIndicator(color: Colors.white)
+                                        : Text(
+                                            "Login",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontFamily: 'DIN_Next_Rounded',
+                                              fontSize: baseFontSize,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: (isLandscape ? 8.0 : 16.0) + bottomInset),
                           ],
                         ),
-                      )),
-                  SizedBox(
-                    height: 20,
+                      ),
+                    ],
                   ),
-                  FadeInUp(
-                      duration: Duration(milliseconds: 1700),
-                      child: Center(
-                          child: TextButton(
-                              onPressed: _launchEmail,
-                              child: Text(
-                                "Butuh Bantuan?",
-                                style: TextStyle(
-                                    color: AppColors.primaryColor,
-                                    fontFamily: 'DIN_Next_Rounded',
-                                    fontSize: fontSize),
-                              )))),
-                  SizedBox(
-                    height: 30,
-                  ),
-                  FadeInUp(
-                      duration: Duration(milliseconds: 1900),
-                      child: MaterialButton(
-                        onPressed: login,
-                        color: GlobalVar.primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                        height: 50,
-                        child: Center(
-                          child: isLoading ?
-                          CircularProgressIndicator() :
-                          Text(
-                            "Login",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontFamily: 'DIN_Next_Rounded',
-                                fontSize: fontSize
-                            ),
-                          ),
-                        ),
-                      )),
-                  SizedBox(
-                    height: 30,
-                  ),
-                ],
+                ),
               ),
-            )
-          ],
+            );
+          },
         ),
       ),
     );

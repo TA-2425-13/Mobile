@@ -8,8 +8,9 @@ pubspec.lock
 android/.gradle/
 android/build/
 android/app/build/
-android/app/google-services.json
 *.keystore
+*.jks
+android/key.properties
 
 # iOS related
 ios/Pods/
@@ -30,9 +31,15 @@ ios/GoogleService-Info.plist
 build/
 *.apk
 *.ipa
+.env
+
+# Firebase credentials
+secrets/
 
 .flutter-plugins
 .flutter-plugins-dependencies
 .metadata
 app.iml
 devtools_options.yaml
+.tmp/
+keystore_base64.txt
